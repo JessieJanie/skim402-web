@@ -12,7 +12,6 @@ import {
   getBearerToken,
   isBlockedUrl,
   mapPool,
-  originOf,
   sameOrigin,
   decodeXml,
   safeFetch,

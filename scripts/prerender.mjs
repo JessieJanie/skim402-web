@@ -51,13 +51,13 @@ const routes = [
   {
     path: "/playground",
     outFile: "playground/index.html",
-    lastmod: "2026-08-17",
+    lastmod: "2026-08-23",
     title: "Reader Workbench | Skim",
     description:
-      "Test the Skim reader, adjust output options, and generate integration code for your AI agent.",
+      "Try Skim in the browser: one page, several pages, extract a table, or watch a page for changes. Uses the same free trial key as a single read.",
     ogTitle: "Reader Workbench | Skim",
     ogDescription:
-      "Test the Skim reader, adjust output options, and generate integration code for your AI agent.",
+      "Try one page, several pages, extract a table, or watch a page — no curl required.",
   },
   {
     path: "/pricing",

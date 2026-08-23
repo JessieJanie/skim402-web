@@ -1933,7 +1933,11 @@ const feed = await res.json();`}
               <Link href="/pricing" className="text-primary hover:underline">
                 card plan
               </Link>
-              . Checkout returns an API token (shown once — store it like a
+              . Try read, batch, extract, and watch in the{" "}
+              <Link href="/playground" className="text-primary hover:underline">
+                Workbench
+              </Link>{" "}
+              without writing curl. Checkout returns an API token (shown once — store it like a
               password), and every call authenticates with it:
             </p>
             <Code>{`Authorization: Bearer sk402_...     # or the x-skim-token header`}</Code>

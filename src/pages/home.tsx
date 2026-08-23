@@ -138,7 +138,7 @@ function TrialKeyBox() {
         ) : (
           <>
             <h2>Create a free API key.</h2>
-            <p className="skim-trial-sub">No signup. No card. 1,000 credits on us — paste it into your agent and go.</p>
+            <p className="skim-trial-sub">No wallet. No crypto. 1,000 credits — paste the key into your agent and go.</p>
             <button
               type="button"
               className="skim-trial-btn"
@@ -297,10 +297,9 @@ function HeroDemo() {
                   <span className="skim-markdown-idle">
                     {"Skim strips any URL down to clean markdown — no ads, no nav, no noise.\n\n"}
                     {"Paste a URL above and hit Enter to see the output.\n\n"}
-                    {"Reads cost $0.002 each. Free plan: 1,000 credits/month with no credit card required.\n\n"}
-                    {"Two ways to pay:\n"}
-                    {"  • Card plan → skim402.com/pricing\n"}
-                    {"  • Wallet pay (USDC on Base, no account) → skim402.com/wallet"}
+                    {"Start with a free API key — 1,000 credits, no wallet required.\n\n"}
+                    {"Monthly Free Plan: card on file, never charged → skim402.com/pricing\n"}
+                    {"Wallet pay (USDC on Base) is optional → skim402.com/wallet"}
                   </span>
                 )}
         </div>
@@ -308,9 +307,9 @@ function HeroDemo() {
           <div className="skim-noscript-offer">
             <p>Skim turns any URL into clean markdown — no ads, no nav, no noise. $0.002 per read.</p>
             <p>
-              <a href="/pricing">Card plan — free tier, 1,000 reads/month</a>
+              <a href="/pricing">Start free — 1,000 credits, no crypto</a>
               {" · "}
-              <a href="/wallet">Wallet pay — $0.002/read, no account needed</a>
+              <a href="/wallet">Wallet pay is optional</a>
             </p>
           </div>
         </noscript>
@@ -340,42 +339,32 @@ export default function Home() {
 
         <section id="top" className="skim-hero">
           <p className="skim-eyebrow">Just skim it...</p>
-          <HeroDemo />
-          <h1 style={{margin:"28px 0 8px",color:"#5e6778",fontSize:"44px",fontWeight:700,lineHeight:1.1,letterSpacing:"-.055em",textAlign:"center"}}>Clean markdown for any URL.</h1>
-          <p className="skim-proof" style={{textAlign:"center"}}>$0.002/read · 4x smaller than raw HTML · Agent-native</p>
-          {/* Static CTA row — always in server HTML; visible to crawlers, agents, and humans */}
+          <h1 style={{margin:"0 0 8px",color:"#5e6778",fontSize:"44px",fontWeight:700,lineHeight:1.1,letterSpacing:"-.055em",textAlign:"center"}}>Clean markdown for any URL.</h1>
+          <p className="skim-proof" style={{textAlign:"center",marginTop:8}}>Free API key · 1,000 credits · no wallet required</p>
+          <TrialKeyBox />
+          {/* Static CTA — always in server HTML; visible to crawlers, agents, and humans */}
           <div className="skim-hero-offers">
-            <a href="/pricing" className="skim-hero-offer-link">
-              <span className="skim-hero-offer-label">CARD PAY</span>
-              Free plan · 1,000 reads/month · from $15/mo
-            </a>
-            <span className="skim-hero-offer-sep" aria-hidden="true">or</span>
-            <a href="/wallet" className="skim-hero-offer-link">
-              <span className="skim-hero-offer-label">WALLET PAY</span>
-              $0.002/read · USDC on Base · no account needed
+            <a href="/pricing" className="skim-hero-offer-link skim-hero-offer-primary">
+              <span className="skim-hero-offer-label">START FREE</span>
+              Monthly Free Plan · 1,000 credits · card never charged
             </a>
           </div>
-          {/* Unifying line — static, always in initial HTML */}
           <p className="skim-hero-unify">
-            Same clean markdown reader —{" "}
-            <a href="/pricing">API key + card plan</a>
-            {" "}or{" "}
-            <a href="/wallet">x402 wallet pay</a>.
-            {" "}Free tier: 1,000 credits/month, no card required.
+            Wallet pay with USDC on Base is optional —{" "}
+            <a href="/wallet">x402 path if you want it</a>.
           </p>
+          <HeroDemo />
         </section>
 
         <section className="skim-connect">
           <div className="skim-connect-row">
-            <div className="skim-connect-copy"><h2>Get your agent skimming now.</h2><p>Agents are built to do agent work. Skim is built to read the web for them.</p></div>
+            <div className="skim-connect-copy"><h2>Get your agent skimming now.</h2><p>Start with a free API key. Skim reads the web so your agent doesn&apos;t have to parse HTML.</p></div>
           </div>
           <p className="skim-github">See the integration code on GitHub → <a href="https://github.com/JessieJanie/skim-tools" style={{color:"rgba(16,19,26,.42)"}}>github.com/JessieJanie/skim-tools</a></p>
         </section>
 
-        <TrialKeyBox />
-
         <section className="skim-headline">
-          <div className="skim-ctas"><a className="skim-btn skim-primary" href="/pricing"><span>Card Pay</span><span className="skim-keyless">SEE PLANS</span></a><a className="skim-btn skim-outline" href="/wallet"><span>Wallet Pay</span><span className="skim-keyless">KEYLESS</span></a></div>
+          <div className="skim-ctas"><a className="skim-btn skim-primary" href="/pricing"><span>Start free</span><span className="skim-keyless">1,000 CREDITS</span></a><a className="skim-btn skim-outline" href="/wallet"><span>Wallet pay</span><span className="skim-keyless">OPTIONAL</span></a></div>
         </section>
 
         <SkimFooter />

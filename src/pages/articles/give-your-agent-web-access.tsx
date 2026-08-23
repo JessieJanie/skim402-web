@@ -48,7 +48,7 @@ export default function GiveYourAgentWebAccess() {
   useDocumentMeta({
     title: "How to Give Your AI Agent Clean Web Reads | Skim™",
     description:
-      "A five-minute quickstart: give your agent a wallet, point an x402 client at Skim, and turn any URL into clean markdown for $0.002 a call — no signup, no API keys.",
+      "A five-minute quickstart: start with a free API key (1,000 credits, no wallet), or optionally pay per call from a Base wallet. Turn any URL into clean markdown for $0.002 a call.",
     canonical: "https://skim402.com/articles/give-your-agent-web-access",
   });
 
@@ -114,10 +114,21 @@ console.log(data.markdown);`}</code>
 
             <p>
               There is a faster way, and you can have it running in about five
-              minutes. No signup. No API key. No credit card on file. Your agent
-              pays Skim a fraction of a cent per page, straight from its own
-              wallet, and gets back clean markdown ready to use. Here is the
-              whole thing, start to finish.
+              minutes. The default path is a free{" "}
+              <code className="font-mono text-sm">sk402_</code> API key — 1,000
+              credits, no wallet, no crypto.{" "}
+              <Link href="/" className="text-primary hover:underline">
+                Create a key
+              </Link>{" "}
+              on the homepage or{" "}
+              <Link href="/pricing" className="text-primary hover:underline">
+                Start free
+              </Link>{" "}
+              on the monthly Free Plan, then send{" "}
+              <code className="font-mono text-sm">Authorization: Bearer sk402_…</code>{" "}
+              to <code className="font-mono text-sm">/api/t/read</code>. The
+              walkthrough below is the optional x402 path: your agent pays a
+              fraction of a cent per page from its own wallet.
             </p>
 
             <p>
@@ -127,13 +138,11 @@ console.log(data.markdown);`}</code>
               <Link href="/docs" className="text-primary hover:underline">
                 docs
               </Link>{" "}
-              and ask it to set up clean web reads with Skim for you. The docs
+              and ask it to create a free API key and wire up{" "}
+              <code className="font-mono text-sm">/api/t/read</code>. The docs
               are written to be read by agents, so yours can do the wiring while
-              you watch. You can even ask it to create and fund a wallet for
-              itself to use. The walkthrough below is here for anyone who wants to
-              see exactly what's happening — but you can absolutely let your agent
-              drive. Keep reading either way; you'll still pick up useful context,
-              including tips for setting up your agent's wallet.
+              you watch. Wallet pay is optional if it already has USDC on Base.
+              The walkthrough below is that optional path.
             </p>
 
             <h2 className="text-2xl font-semibold tracking-tight text-foreground !mt-12">

@@ -99,7 +99,7 @@ const ARTICLES: Article[] = [
     date: "2026-06-06",
     dateDisplay: "June 6, 2026",
     excerpt:
-      "A five-minute quickstart: give your agent a wallet, point an x402 client at Skim, and turn any URL into clean markdown for $0.002 a call — no signup, no API keys.",
+      "A five-minute quickstart: start with a free API key (1,000 credits, no wallet), or optionally pay per call from a Base wallet. Turn any URL into clean markdown for $0.002 a call.",
     author: "Karilyn Colegrove",
   },
   {

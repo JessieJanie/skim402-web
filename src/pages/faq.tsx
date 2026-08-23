@@ -50,11 +50,11 @@ const SECTIONS: Section[] = [
         q: "What is Skim?",
         a: (
           <p>
-            Skim is a pay-per-call reader API for AI agents. Your agent sends a
-            URL to <InlineCode>/api/v1/read</InlineCode> and gets back clean,
-            agent-ready markdown plus structured metadata — typically in about
-            a second. No signup, no API keys, no monthly bills. You pay only
-            for the reads you use.
+            Skim is a reader API for AI agents. Your agent sends a URL and gets
+            back clean, agent-ready markdown plus structured metadata —
+            typically in about a second. Start with a free{" "}
+            <InlineCode>sk402_</InlineCode> API key (1,000 credits, no wallet).
+            Monthly plans are optional; so is paying per call in USDC.
           </p>
         ),
       },
@@ -73,12 +73,12 @@ const SECTIONS: Section[] = [
         q: "How is Skim different from other reader APIs?",
         a: (
           <p>
-            Two things: no account, and per-call pricing. Other readers assume
-            a human signs up, manages an API key, and pays a monthly bill.
-            Skim assumes the caller is an agent: it just pays a fraction of a
-            cent per read and gets its markdown. It's also deliberately narrow
-            — Skim reads the URL you already have, fast and clean. It's not a
-            search engine and not a site-wide crawler.
+            Skim is deliberately narrow — one URL in, clean markdown out — and
+            priced for agents, not LLM-token rates. You can start with a free
+            API key (no wallet, no crypto). Teams that want invoices use a
+            card plan. Agents that already have a Base wallet can pay per
+            call instead. It&apos;s not a search engine and not a site-wide
+            crawler.
           </p>
         ),
       },
@@ -126,11 +126,11 @@ const SECTIONS: Section[] = [
         q: "Is Skim free?",
         a: (
           <p>
-            You can{" "}
-            <ExtLink href="https://freeskims.skim402.com">try it free</ExtLink>{" "}
-            right now, and the <PageLink href="/pricing">card Free Plan</PageLink>{" "}
-            includes 1,000 clean reads every month at no charge. Beyond that,
-            reads cost fractions of a cent, so light usage costs pennies.
+            Yes. Create a free API key on the{" "}
+            <PageLink href="/">homepage</PageLink> (1,000 credits, no wallet),
+            or start the <PageLink href="/pricing">monthly Free Plan</PageLink>{" "}
+            — card on file, never charged, 1,000 reads every month. Beyond
+            that, reads cost fractions of a cent.
           </p>
         ),
       },
@@ -160,11 +160,11 @@ const SECTIONS: Section[] = [
         q: "What payment methods do you accept?",
         a: (
           <p>
-            The easiest way is <PageLink href="/pricing">paying by card</PageLink>{" "}
-            — a normal credit card, real invoices, cancel anytime.
-            Alternatively, agents with their own{" "}
-            <PageLink href="/wallet">funded wallet</PageLink> can pay per call
-            directly, with no account at all.
+            Start with a free <InlineCode>sk402_</InlineCode> key, or a{" "}
+            <PageLink href="/pricing">card plan</PageLink> — normal credit
+            card, real invoices, cancel anytime. Agents that already have a{" "}
+            <PageLink href="/wallet">funded wallet</PageLink> can optionally
+            pay per call in USDC instead.
           </p>
         ),
       },
@@ -200,11 +200,12 @@ const SECTIONS: Section[] = [
         q: "Is it safe to put Skim in my agent?",
         a: (
           <p>
-            Skim holds no credentials for you and has no access to your
-            systems — it takes a URL and returns text. There's no API key to
-            leak and no account to compromise. Fetches are SSRF-protected:
-            private, loopback, and cloud-metadata address ranges are rejected
-            at every redirect hop.
+            Skim holds no credentials for the pages it reads and has no access
+            to your systems — it takes a URL and returns text. Treat your{" "}
+            <InlineCode>sk402_</InlineCode> key like any other API secret; on
+            the optional wallet path, use a small dedicated wallet. Fetches
+            are SSRF-protected: private, loopback, and cloud-metadata address
+            ranges are rejected at every redirect hop.
           </p>
         ),
       },
@@ -225,11 +226,13 @@ const SECTIONS: Section[] = [
         q: "How do I add Skim to my agent?",
         a: (
           <p>
-            For Claude or Cursor, install the MCP server with{" "}
-            <InlineCode>npx -y skim-mcp</InlineCode>. For everything else —
-            LangChain, CrewAI, LlamaIndex, Vercel AI SDK, plain HTTP — see the{" "}
-            <PageLink href="/docs">docs</PageLink> or grab a ready-made
-            connector on{" "}
+            Easiest: create a free API key on the{" "}
+            <PageLink href="/">homepage</PageLink> and send it as{" "}
+            <InlineCode>Authorization: Bearer sk402_…</InlineCode> to{" "}
+            <InlineCode>/api/t/read</InlineCode>. Copy-paste snippets are in
+            the <PageLink href="/docs">docs</PageLink>. The MCP server (
+            <InlineCode>npx -y skim-mcp</InlineCode>) is the optional wallet
+            path. Connectors also live on{" "}
             <ExtLink href="https://github.com/JessieJanie/skim-tools">
               GitHub
             </ExtLink>

@@ -1,7 +1,7 @@
 {
   "x402": "1.0",
   "name": "Skim",
-  "description": "Clean web reader for AI agents. Two ways to pay: card plan with API key (free tier 1,000 reads/month, skim402.com/pricing) or x402 wallet pay-per-call ($0.002 USDC on Base, no account needed).",
+  "description": "Clean web reader for AI agents. Default path: free API key (1,000 credits, no wallet) at skim402.com. This file describes the optional x402 wallet path \u2014 $0.002 USDC on Base per read.",
   "capabilities": ["read", "content", "markdown", "extract", "scrape", "watch", "monitor", "diff"],
   "pricing": { "currency": "USDC", "base": "0.002", "unit": "request" },
   "payment": {

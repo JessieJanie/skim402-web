@@ -333,14 +333,14 @@ export default function Docs() {
                 <tbody>
                   <tr className="border-b border-border/40">
                     <td className="px-5 py-4 font-mono text-foreground font-semibold">API key<br/><span className="font-normal text-muted-foreground text-xs">sk402_…</span></td>
-                    <td className="px-5 py-4 text-muted-foreground">Humans, teams, normal integrations. You pay by card on a monthly plan.</td>
+                    <td className="px-5 py-4 text-muted-foreground">Default path. Humans, teams, and agents. Free key or monthly card plan.</td>
                     <td className="px-5 py-4 text-muted-foreground">
                       <Link href="/pricing" className="text-primary hover:underline">Get a plan</Link> → receive an <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">sk402_</code> key → send it as <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">Authorization: Bearer sk402_…</code> on <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/t/</code> endpoints. Credits deducted per call.
                     </td>
                   </tr>
                   <tr>
                     <td className="px-5 py-4 font-mono text-foreground font-semibold">x402 wallet<br/><span className="font-normal text-muted-foreground text-xs">USDC on Base</span></td>
-                    <td className="px-5 py-4 text-muted-foreground">Autonomous agents that shouldn't need a billing account. No key, no signup required.</td>
+                    <td className="px-5 py-4 text-muted-foreground">Optional. Autonomous agents that already hold USDC on Base.</td>
                     <td className="px-5 py-4 text-muted-foreground">
                       <Link href="/wallet" className="text-primary hover:underline">Fund a Base wallet</Link> with USDC → use an x402-aware HTTP client → it pays each 402 response automatically. $0.002 per read, settled on-chain.
                     </td>
@@ -356,15 +356,15 @@ export default function Docs() {
             {/* ── Quickstart ─────────────────────────────────────────── */}
             <H2 id="quickstart">Quickstart</H2>
 
-            <H3>API key path — card plan</H3>
+            <H3>API key path — start here</H3>
             <P>
-              <Link href="/pricing" className="text-primary hover:underline">Sign up for a plan</Link> (free tier included — 1,000 credits/month). You'll get an <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">sk402_</code> API key instantly. Pass it in the <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">Authorization</code> header on every request to the <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/t/</code> endpoints.
+              Create a free key on the <Link href="/" className="text-primary hover:underline">homepage</Link> (1,000 credits, no wallet) or <Link href="/pricing" className="text-primary hover:underline">Start free</Link> on the monthly Free Plan (card on file, never charged). You'll get an <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">sk402_</code> API key. Pass it in the <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">Authorization</code> header on every request to the <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/t/</code> endpoints.
             </P>
             <ApiKeyExamples />
 
-            <H3>x402 wallet path — per-call USDC</H3>
+            <H3>x402 wallet path — optional, per-call USDC</H3>
             <P>
-              Skim is also built on{" "}
+              Prefer not to hold an API key? Skim is also built on{" "}
               <a
                 className="text-primary hover:underline"
                 href="https://x402.org"
@@ -373,17 +373,17 @@ export default function Docs() {
               >
                 x402
               </a>
-              — an open HTTP 402 payment protocol for autonomous agents. No
-              key required for this path. Fund a wallet with USDC on Base and
-              point any x402-aware HTTP client at the <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/v1/</code> endpoints.
+              — an open HTTP 402 payment protocol. This path is optional. Fund a
+              wallet with USDC on Base and point any x402-aware HTTP client at
+              the <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/v1/</code> endpoints.
             </P>
             <WalletExamples />
 
             <P>
               Not writing the code yourself? These docs are written to be read
-              by AI agents — hand this page to yours and ask it to wire up
-              clean web reads with Skim. It can also create and fund a wallet
-              for itself.
+              by AI agents — hand this page to yours and ask it to create a
+              free API key and wire up <InlineCode>/api/t/read</InlineCode>.
+              Wallet pay is optional if it already has USDC on Base.
             </P>
             <P>
               Want to see the output first?{" "}
@@ -463,18 +463,29 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # for the MCP server below`}
 
             <H2 id="mcp">Use from Claude / Cursor (MCP)</H2>
             <P>
-              The fastest way to give Claude, Cursor, Codex, Cline, or any other
-              MCP-compatible client the ability to read the open web is to
-              install <InlineCode>skim-mcp</InlineCode>. It's a tiny stdio
-              server that wraps Skim's <InlineCode>/v1/read</InlineCode>
-              endpoint, handles the x402 payment handshake locally with your
-              wallet, and exposes a single <InlineCode>read_url</InlineCode>{" "}
-              tool to the agent.
+              Don&apos;t want a wallet? Skip this section. Create a free{" "}
+              <InlineCode>sk402_</InlineCode> key on the{" "}
+              <Link href="/" className="text-primary hover:underline">
+                homepage
+              </Link>{" "}
+              (1,000 credits) and call{" "}
+              <InlineCode>GET /api/t/read</InlineCode> with{" "}
+              <InlineCode>Authorization: Bearer sk402_…</InlineCode> — see{" "}
+              <a href="#quickstart" className="text-primary hover:underline">
+                Quickstart
+              </a>
+              . The hosted remote MCP at{" "}
+              <InlineCode>https://skim402.com/api/mcp</InlineCode> also works
+              on a shared free tier with no wallet.
             </P>
             <P>
-              You'll need a <strong>Base wallet private key</strong> with a
-              little USDC in it. A dollar funds ~500 reads. Use a fresh wallet —
-              not your personal one.
+              The local <InlineCode>skim-mcp</InlineCode> server is the optional
+              x402 path. It wraps Skim&apos;s <InlineCode>/v1/read</InlineCode>{" "}
+              endpoint, signs each payment from a Base wallet, and exposes a
+              single <InlineCode>read_url</InlineCode> tool. That path still
+              uses <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> — a fresh
+              wallet with a little USDC, not your personal one. A dollar funds
+              ~500 reads.
             </P>
 
             <H3>Remote connector (no install)</H3>
@@ -1913,15 +1924,17 @@ const feed = await res.json();`}
 
             <H2 id="card">Pay by card (token auth)</H2>
             <p className="text-muted-foreground mb-4">
-              Everything above pays per call over x402. If your team prefers a
-              credit card and a monthly invoice, the{" "}
-              <Link href="/pricing" className="text-primary hover:underline">
-                card plans
+              The default path is an API key on token-authenticated endpoints
+              under <InlineCode>/t/</InlineCode>. Create a free key on the{" "}
+              <Link href="/" className="text-primary hover:underline">
+                homepage
               </Link>{" "}
-              expose the same reader on token-authenticated endpoints under{" "}
-              <InlineCode>/t/</InlineCode>. Checkout returns an API token
-              (shown once — store it like a password), and every call
-              authenticates with it:
+              or pick a{" "}
+              <Link href="/pricing" className="text-primary hover:underline">
+                card plan
+              </Link>
+              . Checkout returns an API token (shown once — store it like a
+              password), and every call authenticates with it:
             </p>
             <Code>{`Authorization: Bearer sk402_...     # or the x-skim-token header`}</Code>
             <div className="space-y-3 mt-6 mb-6">

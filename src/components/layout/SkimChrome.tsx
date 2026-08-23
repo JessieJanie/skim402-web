@@ -34,8 +34,8 @@ export function SkimNav() {
       <div className="skim-navlinks">
         <Link href="/playground">Workbench</Link>
         <Link href="/signals">Signals</Link>
-        <Link href="/pricing">Card Pay</Link>
-        <Link href="/wallet">Wallet Pay</Link>
+        <Link href="/pricing">Plans</Link>
+        <Link href="/wallet">Wallet</Link>
         <Link href="/docs">Docs</Link>
         <Show when="signed-in">
           <Link href="/dashboard">Dashboard</Link>

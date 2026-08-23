@@ -184,7 +184,7 @@ curl -X POST https://skim402.com/api/v1/read \\
     case "other":
     default:
       return {
-        note: "Any x402-compatible client works. The wallet's private key is the only credential — set it as SKIM_WALLET_PRIVATE_KEY and point the client at the Skim endpoint. The MCP server is the fastest path for most agents:",
+        note: "This optional path uses the wallet private key as SKIM_WALLET_PRIVATE_KEY. Most people start with a free sk402_ API key instead (see the homepage). If you're staying on x402, the MCP server is the usual setup:",
         lang: "json",
         code: MCP_CONFIG,
       };
@@ -288,8 +288,13 @@ function SetupPicker() {
         </pre>
       </div>
       <p className="text-xs text-muted-foreground mt-3">
-        Don't have a wallet or its private key yet? The five-step setup is right
-        below — then drop the key into <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> above.
+        Don&apos;t want a wallet?{" "}
+        <Link href="/" className="text-primary underline-offset-4 hover:underline">
+          Create a free API key
+        </Link>{" "}
+        instead. If you&apos;re staying on this path, the five-step setup is
+        below — then drop the key into{" "}
+        <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> above.
       </p>
     </div>
   );
@@ -312,10 +317,31 @@ export default function WalletPage() {
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-3">
             Wire up your agent's <span className="text-primary">wallet.</span>
           </h1>
+          <p className="text-muted-foreground mb-6">
+            This is the optional x402 path: pay per call in USDC on Base. Most
+            people skip it and start with a free API key instead.
+          </p>
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 mb-8">
+            <h3 className="font-bold text-foreground mb-1">
+              Don&apos;t want a wallet?
+            </h3>
+            <p className="text-muted-foreground text-sm">
+              Create a free <code className="font-mono text-xs">sk402_</code>{" "}
+              key — 1,000 credits, no crypto.{" "}
+              <Link href="/" className="text-primary underline-offset-4 hover:underline">
+                Create key
+              </Link>
+              {" "}on the homepage, or{" "}
+              <Link href="/pricing" className="text-primary underline-offset-4 hover:underline">
+                Start free
+              </Link>
+              {" "}on the monthly Free Plan (card on file, never charged).
+            </p>
+          </div>
           <p className="text-muted-foreground mb-8">
-            Choose your agent and how it should connect, and we'll give you the
-            exact snippet to pay Skim from your wallet. The wallet's private key
-            is the only credential.
+            Still want wallet pay? Choose your agent and how it should connect,
+            and we&apos;ll give you the snippet. The wallet&apos;s private key is
+            the credential for this path.
           </p>
           <SetupPicker />
         </div>
@@ -326,20 +352,23 @@ export default function WalletPage() {
         <div className="container mx-auto px-4 max-w-3xl">
           <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
             <h3 className="font-bold text-foreground mb-2">
-              Newest to all this? You can just use a card.
+              Funding this wallet with a card
             </h3>
             <p className="text-muted-foreground text-sm mb-4">
-              You don't need an exchange account or any crypto to get started.
-              The Coinbase Wallet extension in step 1 has a "Buy" button built
-              right in — pay with a{" "}
+              Prefer the API-key path?{" "}
+              <Link href="/pricing" className="text-primary underline-offset-4 hover:underline">
+                Start free
+              </Link>
+              {" "}— no USDC required. If you&apos;re staying on wallet pay, you
+              still don&apos;t need an exchange account. The Coinbase Wallet
+              extension in step 1 has a &quot;Buy&quot; button built right in —
+              pay with a{" "}
               <strong className="text-foreground">credit card</strong> (or
               debit), choose USDC (a stablecoin pegged to the US dollar) on{" "}
-              <strong>Base</strong>, and you're funded in a couple of minutes.
-              No buying and selling cryptocoins on the spot market, no confusing
-              cryptocoin trading pairs — your card converts to USDC
+              <strong>Base</strong>, and you&apos;re funded in a couple of
+              minutes. No buying and selling cryptocoins on the spot market, no
+              confusing cryptocoin trading pairs — your card converts to USDC
               automatically, and every top-up later works the same way.
-              From there it's the same five steps as everyone else. The card
-              part is the easy bit.
             </p>
             <ExtLink href="https://www.coinbase.com/wallet/downloads">
               Get Coinbase Wallet

@@ -23,60 +23,60 @@ export const COPY_SLOTS: Record<string, CopySlot> = {
   "home.headline": {
     label: "Home — big headline",
     hint: "Text wrapped in **double asterisks** shows in blue.",
-    text: '"Can my agent just pay **with money?**"',
+    text: "Clean markdown for any URL. **No wallet required.**",
   },
   "home.yes": {
     label: "Home — the Yes line",
-    text: "Yes. Finally. Just these 3 easy steps (no signups or API keys):",
+    text: "Start with a free API key — 1,000 credits, no crypto:",
   },
   "home.step1": {
     label: "Home — step 1",
     hint: "Links use [link text](url).",
-    text: "1. Get your agent its own wallet, funded with a credit or debit card — [details here](/wallet#fund).",
+    text: "1. Create a key on the homepage, or [Start free](/pricing) on the Free Plan (card on file, never charged).",
   },
   "home.step2": {
     label: "Home — step 2",
-    text: "2. Give your agent the wallet's key — [details here](/wallet#key).",
+    text: "2. Paste the sk402_ key into your agent — [curl and snippets in the docs](/docs#quickstart).",
   },
   "home.step3": {
     label: "Home — step 3",
-    text: "3. Tell your agent to go to skim402.com to wire itself up.",
+    text: "3. Wallet pay (USDC on Base) is optional — [details here](/wallet) if you want per-call x402.",
   },
   "home.congrats": {
     label: "Home — congratulations line",
-    text: "Congratulations! Your agent can now use Skim and all other x402 tools — just send it shopping at a directory such as [agentic.market](https://agentic.market) to find them.",
+    text: "That's it. Your agent can read the web. x402 wallet pay stays available as a second path — browse other x402 tools at [agentic.market](https://agentic.market) if you want them.",
   },
   "home.descriptor": {
     label: "Home — supporting paragraph (what Skim is + prices)",
-    text: "Skim turns any URL into agent-ready markdown for $0.002 per read, or typed JSON for $0.015. Pay by card on a monthly plan, or per-call in USDC by crypto wallet. Don't pay LLM rates for non-LLM work.",
+    text: "Skim turns any URL into agent-ready markdown for $0.002 per read, or typed JSON for $0.015. Start with a free API key. Pay by card on a monthly plan, or optionally per-call in USDC by crypto wallet. Don't pay LLM rates for non-LLM work.",
   },
   "home.freeNote": {
     label: "Home — note under the buttons",
-    text: "10 free skims a day for humans — no signup, no wallet, no API key.",
+    text: "Instant API key: 1,000 credits, no signup, no wallet. Monthly Free Plan: card on file, never charged.",
   },
   "faq.question": {
     label: "Q&A — highlighted question",
-    text: "Can my agent just pay with money?",
+    text: "Do I need a crypto wallet to use Skim?",
   },
   "faq.yes": {
     label: "Q&A — the Yes line",
-    text: "Yes. Finally. Just these 3 easy steps (no signups or API keys):",
+    text: "No. Start with a free API key — 1,000 credits, no crypto:",
   },
   "faq.step1": {
     label: "Q&A — step 1 (numbering is automatic)",
-    text: "Get your agent its own wallet, funded with a credit or debit card — [details here](/wallet#fund).",
+    text: "Create a key on the homepage, or [Start free](/pricing) on the Free Plan (card on file, never charged).",
   },
   "faq.step2": {
     label: "Q&A — step 2",
-    text: "Give your agent the wallet's key — [details here](/wallet#key).",
+    text: "Paste the sk402_ key into your agent — [curl and snippets in the docs](/docs#quickstart).",
   },
   "faq.step3": {
     label: "Q&A — step 3",
-    text: "Tell your agent to go to skim402.com to wire itself up.",
+    text: "Wallet pay (USDC on Base) is optional — [details here](/wallet) if you want per-call x402.",
   },
   "faq.congrats": {
     label: "Q&A — congratulations line",
-    text: "Congratulations! Your agent can now use Skim and all other x402 tools — just send it shopping at a directory such as [agentic.market](https://agentic.market) to find them.",
+    text: "That's it. Your agent can read the web. x402 wallet pay stays available as a second path — browse other x402 tools at [agentic.market](https://agentic.market) if you want them.",
   },
   "faq.detail": {
     label: "Q&A — closing line of the highlighted block",
@@ -84,7 +84,7 @@ export const COPY_SLOTS: Record<string, CopySlot> = {
   },
   "faq.protip": {
     label: "Q&A — PRO TIP block (after the highlighted question)",
-    text: "**PRO TIP:** Running more than one agent? Give a single lead agent its own funded wallet and let it spin up and manage wallets for the rest — issuing each worker agent its own wallet, topping them up as needed, and keeping the books. You only ever top up the lead agent's wallet. One wallet for you to think about, any number of agents at work.",
+    text: "**PRO TIP:** Most teams share one sk402_ API key (or one per environment) and stay on a card plan. If you later want the optional wallet path for many agents, give a single lead agent its own funded wallet and let it spin up and manage wallets for the rest — you only ever top up the lead agent's wallet.",
   },
 };
 

@@ -343,22 +343,29 @@ curl -X POST https://skim402.com/api/v1/read \\
 
             <p>
               That basic read covers the large majority of pages. When you need
-              more, the same wallet and the same pattern carry over:
+              more, the same API key (or wallet) carries over:
             </p>
 
             <ul className="list-disc pl-6 space-y-2">
               <li>
                 <strong>JavaScript-heavy pages</strong> that render client-side —
-                use <code>POST /v1/read/js</code>, which loads the page in a real
-                headless browser first.
+                use <code>GET /api/t/read/js</code> (3 credits) or{" "}
+                <code>POST /v1/read/js</code> on the wallet path.
               </li>
               <li>
-                <strong>Many URLs at once</strong> — <code>POST /v1/read/batch</code>{" "}
-                reads up to ten in a single paid call.
+                <strong>Many URLs at once</strong> — <code>POST /api/t/read/batch</code>{" "}
+                reads up to ten; 1 credit per successful URL.
               </li>
               <li>
-                <strong>Typed JSON instead of markdown</strong> — <code>POST /v1/extract</code>{" "}
-                returns data shaped to a schema you provide.
+                <strong>Typed JSON instead of markdown</strong> —{" "}
+                <code>POST /api/t/extract</code> returns data shaped to a
+                schema you provide (8 credits).
+              </li>
+              <li>
+                <strong>Did this page change?</strong> —{" "}
+                <code>POST /api/t/watch</code> then{" "}
+                <code>GET /api/t/watch/diff?id=</code> (1 credit per
+                successful URL fetch).
               </li>
             </ul>
 

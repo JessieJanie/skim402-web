@@ -251,8 +251,12 @@ export default function Pricing() {
           <div className="mt-12 max-w-2xl mx-auto text-center text-sm text-muted-foreground space-y-2">
             <p>
               A standard read is 1 credit. Pages that need a full browser
-              render cost 2–3 credits. Failed reads are refunded automatically
-              — you only pay for pages Skim actually delivered.
+              render cost 2–3 credits. Batch reads are 1 credit per
+              successful URL (up to 10). Structured extract is 8 credits.
+              Watching a page is 1 credit per successful URL fetch on{" "}
+              <code className="font-mono text-xs">/t/watch</code> (status is
+              free). Failed reads and failed extracts are refunded
+              — you only pay for work Skim delivered.
             </p>
             <p>
               Paid plans keep working past the cap: extra reads are metered and

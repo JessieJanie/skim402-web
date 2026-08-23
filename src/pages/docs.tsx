@@ -16,15 +16,16 @@ const sections: Section[] = [
   { id: "fund", label: "Fund your wallet (x402)" },
   { id: "mcp", label: "Use from Claude / Cursor (MCP)" },
   { id: "payment", label: "Payment (x402)" },
-  { id: "read", label: "POST /v1/read" },
-  { id: "batch", label: "POST /v1/read/batch" },
-  { id: "js", label: "POST /v1/read/js" },
+  { id: "agents", label: "Batch · extract · watch" },
+  { id: "read", label: "GET /t/read" },
+  { id: "batch", label: "POST /t/read/batch" },
+  { id: "js", label: "GET /t/read/js" },
   { id: "chunking", label: "RAG chunking" },
-  { id: "extract", label: "POST /v1/extract" },
+  { id: "extract", label: "POST /t/extract" },
   { id: "presets", label: "Extraction presets" },
   { id: "tables", label: "POST /v1/tables" },
   { id: "dataset", label: "POST /v2/dataset" },
-  { id: "watch", label: "Custom URL watches" },
+  { id: "watch", label: "POST /t/watch" },
   { id: "feed", label: "GET /v2/feeds/x402/latest" },
   { id: "signals", label: "Skim Signal series" },
   { id: "card", label: "Pay by card (token auth)" },
@@ -274,7 +275,7 @@ export default function Docs() {
   useDocumentMeta({
     title: "Docs — reads, Signals, extraction, and more | Skim",
     description:
-      "Complete Skim API docs: reads, JS rendering, batch reads, extraction, tables, datasets, Signals, and Skim Watch. Pay with a card-plan API key or per-call in USDC over x402.",
+      "Skim API docs: batch reads, structured extract, and page watches. Start with a free sk402_ key. Wallet pay is optional.",
     canonical: "https://skim402.com/docs",
   });
 
@@ -309,9 +310,58 @@ export default function Docs() {
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed">
                 Turn any URL into clean, agent-ready markdown with one HTTP
-                request. Two ways to authenticate and pay.
+                request. Start with a free <InlineCode>sk402_</InlineCode> key.
+                Wallet pay is optional.
               </p>
             </div>
+
+            <H2 id="agents">Batch, extract, and watch</H2>
+            <P>
+              Three endpoints agents ask for first. Same credit ledger as a
+              single read — no second billing system. Failed work is not
+              charged.
+            </P>
+            <div className="mt-6 mb-8 overflow-x-auto rounded-xl border border-border/60">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border/60 bg-muted/40">
+                    <th className="text-left px-5 py-3 font-semibold text-foreground">Feature</th>
+                    <th className="text-left px-5 py-3 font-semibold text-foreground">API key</th>
+                    <th className="text-left px-5 py-3 font-semibold text-foreground">Credits</th>
+                    <th className="text-left px-5 py-3 font-semibold text-foreground">Wallet</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-border/40">
+                    <td className="px-5 py-3 font-medium">Batch reads</td>
+                    <td className="px-5 py-3 font-mono text-xs">POST /api/t/read/batch</td>
+                    <td className="px-5 py-3 text-muted-foreground">1 per successful URL (cap 10)</td>
+                    <td className="px-5 py-3 font-mono text-xs">POST /api/v1/read/batch · $0.020</td>
+                  </tr>
+                  <tr className="border-b border-border/40">
+                    <td className="px-5 py-3 font-medium">Extract JSON</td>
+                    <td className="px-5 py-3 font-mono text-xs">POST /api/t/extract</td>
+                    <td className="px-5 py-3 text-muted-foreground">8 credits (failed extracts refunded)</td>
+                    <td className="px-5 py-3 font-mono text-xs">POST /api/v1/extract · $0.015</td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3 font-medium">Watch a page</td>
+                    <td className="px-5 py-3 font-mono text-xs">POST /api/t/watch · GET /diff · GET /status</td>
+                    <td className="px-5 py-3 text-muted-foreground">1 per successful URL fetch; status free</td>
+                    <td className="px-5 py-3 font-mono text-xs">POST /api/v2/watch · $0.01, then $0.005/poll</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <P>
+              Jump to{" "}
+              <a href="#batch" className="text-primary hover:underline">batch</a>
+              {", "}
+              <a href="#extract" className="text-primary hover:underline">extract</a>
+              {", or "}
+              <a href="#watch" className="text-primary hover:underline">watch</a>
+              . Single-URL <a href="#read" className="text-primary hover:underline">read</a> is unchanged.
+            </P>
 
             {/* ── Authentication ─────────────────────────────────────── */}
             <H2 id="auth">Authentication</H2>
@@ -350,7 +400,7 @@ export default function Docs() {
             </div>
 
             <P>
-              The token-gated endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/js</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/batch</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/extract</code>) require an API key and use credit billing. The x402 endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read/js</code>, etc.) require no key — each call is paid in USDC at the moment it succeeds.
+              The token-gated endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/js</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/batch</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/extract</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/watch</code>) require an API key and use credit billing. The x402 endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read/js</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v2/watch</code>, etc.) require no key — each call is paid in USDC at the moment it succeeds.
             </P>
 
             {/* ── Quickstart ─────────────────────────────────────────── */}
@@ -479,13 +529,21 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # for the MCP server below`}
               on a shared free tier with no wallet.
             </P>
             <P>
-              The local <InlineCode>skim-mcp</InlineCode> server is the optional
-              x402 path. It wraps Skim&apos;s <InlineCode>/v1/read</InlineCode>{" "}
-              endpoint, signs each payment from a Base wallet, and exposes a
-              single <InlineCode>read_url</InlineCode> tool. That path still
-              uses <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> — a fresh
-              wallet with a little USDC, not your personal one. A dollar funds
-              ~500 reads.
+              The local <InlineCode>skim-mcp</InlineCode> server prefers a
+              key when <InlineCode>SKIM_API_KEY</InlineCode> is set:{" "}
+              <InlineCode>read_url</InlineCode>,{" "}
+              <InlineCode>read_urls</InlineCode>,{" "}
+              <InlineCode>extract_url</InlineCode>,{" "}
+              <InlineCode>watch_urls</InlineCode>, and{" "}
+              <InlineCode>check_watch</InlineCode> hit{" "}
+              <InlineCode>/api/t/read</InlineCode>,{" "}
+              <InlineCode>/api/t/read/batch</InlineCode>,{" "}
+              <InlineCode>/api/t/extract</InlineCode>, and{" "}
+              <InlineCode>/api/t/watch*</InlineCode>. Without a key it is the
+              optional x402 path —{" "}
+              <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> on a fresh
+              Base wallet with a little USDC, not your personal one. A dollar
+              funds ~500 reads.
             </P>
 
             <H3>Remote connector (no install)</H3>
@@ -719,8 +777,14 @@ Content-Type: application/json
               .
             </P>
 
-            <H2 id="read">POST /v1/read</H2>
-            <P>Fetches a URL and returns clean markdown plus structured metadata.</P>
+            <H2 id="read">GET /t/read · POST /v1/read</H2>
+            <P>
+              Fetches a URL and returns clean markdown plus structured
+              metadata. API key:{" "}
+              <InlineCode>GET /api/t/read?url=…</InlineCode> (1 credit;
+              browser fallback costs 1 extra). Wallet:{" "}
+              <InlineCode>POST /api/v1/read</InlineCode> ($0.002).
+            </P>
 
             <H3>Request body</H3>
             <div className="rounded-xl border border-border bg-card px-6">
@@ -888,14 +952,83 @@ Content-Type: application/json
               </Field>
             </div>
 
-            <H2 id="batch">POST /v1/read/batch</H2>
+            <H2 id="batch">POST /t/read/batch</H2>
             <P>
-              Reads up to 10 URLs in a single paid call. Each URL is fetched
-              concurrently (capped at 5 in-flight). One x402 payment covers the
-              whole batch — priced at 10x the per-call rate (
-              <InlineCode>$0.020</InlineCode>), so it's the same per URL when
-              you actually use 10, and saves your agent from signing 10
-              separate payments.
+              Reads up to 10 URLs in one request and returns clean markdown
+              per URL. Partial success is OK — failed URLs come back as
+              errors and are not charged. Credits equal the number of
+              successful reads (<InlineCode>charged</InlineCode> in the
+              response). Same SSRF rules as a single read.
+            </P>
+            <H3>API key — start here</H3>
+            <P>
+              1 credit per successful URL. Empty body or more than 10 URLs
+              returns <InlineCode>400</InlineCode> and does not spend
+              credits.
+            </P>
+            <Code>
+{`curl -X POST https://skim402.com/api/t/read/batch \\
+  -H "Authorization: Bearer sk402_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "urls": [
+      "https://example.com",
+      "https://example.com/missing"
+    ]
+  }'`}
+            </Code>
+            <H3>Response (API key)</H3>
+            <Code>
+{`{
+  "items": [
+    {
+      "url": "https://example.com",
+      "ok": true,
+      "data": {
+        "url": "https://example.com",
+        "finalUrl": "https://example.com/",
+        "mode": "basic",
+        "markdown": "This domain is for use in documentation examples…",
+        "text": "This domain is for use in documentation examples…",
+        "metadata": {
+          "title": "Example Domain",
+          "excerpt": "This domain is for use in documentation examples…",
+          "lang": "en",
+          "length": 111
+        },
+        "receipt": {
+          "contentHash": "25b9c4cfa6f380f477c8e7ed991eba7e…",
+          "markdownHash": "a80242055d7489b4ce56b3193e7521cd…",
+          "tokensEst": 38,
+          "cacheHit": true
+        }
+      },
+      "cacheHit": true,
+      "error": null
+    },
+    {
+      "url": "https://example.com/missing",
+      "ok": false,
+      "data": null,
+      "cacheHit": false,
+      "error": { "status": 422, "message": "Upstream responded 404" }
+    }
+  ],
+  "charged": 1
+}`}
+            </Code>
+            <P>
+              <InlineCode>charged</InlineCode> is the credits actually
+              spent — here 1, because only one URL succeeded. Optional body
+              fields: <InlineCode>stripLinks</InlineCode>,{" "}
+              <InlineCode>stripImages</InlineCode> (booleans).
+            </P>
+            <H3>Wallet path (optional)</H3>
+            <P>
+              Same idea, paid in USDC. One x402 payment covers the whole
+              batch at <InlineCode>$0.020</InlineCode>. Per-URL failures
+              stay inside the payload; if every URL fails the route returns{" "}
+              <InlineCode>422</InlineCode> and settlement is skipped.
             </P>
             <H3>Request body</H3>
             <div className="rounded-xl border border-border bg-card px-6">
@@ -970,15 +1103,16 @@ Content-Type: application/json
             </Code>
             <H3>Partial failures and refunds</H3>
             <P>
-              Per-URL failures (bad URL, paywall, JS-only page) are surfaced
-              inside the <InlineCode>results</InlineCode> array — they do not
-              fail the whole batch, and you still pay for the batch as a
-              whole. If <em>every</em> URL in the batch fails, the endpoint
-              returns <InlineCode>422</InlineCode> and the x402 facilitator
-              skips settlement entirely — your wallet is untouched.
+              On the API-key path, failed URLs are listed on{" "}
+              <InlineCode>items</InlineCode> with <InlineCode>ok: false</InlineCode>{" "}
+              and are not included in <InlineCode>charged</InlineCode>. On the
+              wallet path, per-URL failures stay inside{" "}
+              <InlineCode>results</InlineCode> and you still pay for the
+              batch as a whole; if <em>every</em> URL fails the endpoint
+              returns <InlineCode>422</InlineCode> and settlement is skipped.
             </P>
 
-            <H2 id="js">POST /v1/read/js</H2>
+            <H2 id="js">GET /t/read/js · POST /v1/read/js</H2>
             <P>
               Same idea as <InlineCode>/v1/read</InlineCode>, but the page is
               rendered with a real headless browser before extraction. Use
@@ -1120,7 +1254,69 @@ Content-Type: application/json
               entirely when the flag is off.
             </P>
 
-            <H2 id="extract">POST /v1/extract</H2>
+            <H2 id="extract">POST /t/extract</H2>
+            <P>
+              Takes a URL plus a JSON Schema (and an optional short intent)
+              and returns structured JSON — rows or objects, not only
+              markdown. Values come from the page; fields the page does not
+              state come back null or omitted, never invented.
+            </P>
+            <H3>API key — start here</H3>
+            <P>
+              8 credits on success. Failed extracts are refunded.{" "}
+              <InlineCode>schema</InlineCode> is required (a bare intent
+              string is <InlineCode>400</InlineCode>). Put column hints in{" "}
+              <InlineCode>instructions</InlineCode> — e.g. “main table” or
+              “status code and meaning”.
+            </P>
+            <Code>
+{`curl -X POST https://skim402.com/api/t/extract \\
+  -H "Authorization: Bearer sk402_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "url": "https://en.wikipedia.org/wiki/List_of_HTTP_status_codes",
+    "instructions": "main table of status codes",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "meaning": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }'`}
+            </Code>
+            <H3>Response (API key)</H3>
+            <Code>
+{`{
+  "url": "https://en.wikipedia.org/wiki/List_of_HTTP_status_codes",
+  "finalUrl": "https://en.wikipedia.org/wiki/List_of_HTTP_status_codes",
+  "data": {
+    "rows": [
+      { "code": "200", "meaning": "OK" },
+      { "code": "402", "meaning": "Payment Required" },
+      { "code": "404", "meaning": "Not Found" }
+    ]
+  }
+}`}
+            </Code>
+            <P>
+              Wallet path below is the same extractor at{" "}
+              <InlineCode>$0.015</InlineCode>. HTML{" "}
+              <InlineCode>&lt;table&gt;</InlineCode> markup can also use the
+              cheaper mechanical{" "}
+              <a href="#tables" className="text-primary hover:underline">
+                /v1/tables
+              </a>{" "}
+              route ($0.003, no LLM) — wallet only today.
+            </P>
             <P>
               Takes a URL plus a JSON Schema and returns schema-conforming
               JSON. Skim fetches and cleans the page the same way{" "}
@@ -1572,7 +1768,113 @@ curl https://skim402.com/api/v2/dataset/ds_LviVNQtobY0pSEfxpRqB7K0O`}
               rejected before payment settles.
             </P>
 
-            <H2 id="watch">Custom URL watches</H2>
+            <H2 id="watch">Watch a page</H2>
+            <P>
+              Register 1–20 URLs, then poll for what changed. Same credit
+              ledger as a single read — 1 credit per successful fetch.
+              Status is free. No email, no cron — your agent polls when it
+              wants. These are the paths{" "}
+              <InlineCode>skim-mcp</InlineCode> uses for{" "}
+              <InlineCode>watch_urls</InlineCode> and{" "}
+              <InlineCode>check_watch</InlineCode> when{" "}
+              <InlineCode>SKIM_API_KEY</InlineCode> is set.
+            </P>
+            <H3>API key — POST /api/t/watch</H3>
+            <P>
+              Auth is <InlineCode>Authorization: Bearer sk402_…</InlineCode>{" "}
+              (or <InlineCode>x-skim-token</InlineCode>). Register with{" "}
+              <InlineCode>POST /api/t/watch</InlineCode>, poll with{" "}
+              <InlineCode>GET /api/t/watch/diff?id=</InlineCode>, metadata
+              with <InlineCode>GET /api/t/watch/status?id=</InlineCode>.
+              Register validates the first URL via{" "}
+              <InlineCode>/t/read</InlineCode> before creating the watch (1
+              credit on success). An unreadable first URL returns{" "}
+              <InlineCode>422</InlineCode> and no watch is stored. Each
+              successful URL fetch on a diff costs 1 credit; failed URLs
+              come back as <InlineCode>error</InlineCode> and are not
+              charged. Polls within 60 seconds return the cached result with{" "}
+              <InlineCode>"fresh": true</InlineCode>. The{" "}
+              <InlineCode>watchId</InlineCode> is scoped to the creating key
+              — treat it like a bearer secret.
+            </P>
+            <H3>Register</H3>
+            <Code>
+{`curl -X POST https://skim402.com/api/t/watch \\
+  -H "Authorization: Bearer sk402_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "urls": [
+      "https://competitor.com/pricing",
+      "https://competitor.com/changelog"
+    ],
+    "note": "competitor pricing + changelog"
+  }'
+
+# -> 201
+{
+  "watchId": "w_kF3nW8pQx2LmT9rYb6JcHd0V",
+  "urls": ["https://competitor.com/pricing", "https://competitor.com/changelog"],
+  "note": "competitor pricing + changelog",
+  "pollUrl": "/api/t/watch/diff?id=w_kF3nW8pQx2LmT9rYb6JcHd0V",
+  "minIntervalSeconds": 60,
+  "charged": 1
+}`}
+            </Code>
+            <H3>Poll for changes</H3>
+            <Code>
+{`curl "https://skim402.com/api/t/watch/diff?id=w_kF3nW8pQx2LmT9rYb6JcHd0V" \\
+  -H "Authorization: Bearer sk402_YOUR_KEY"
+
+# -> 200
+{
+  "watchId": "w_kF3nW8pQx2LmT9rYb6JcHd0V",
+  "polledAt": "2026-07-14T12:00:00Z",
+  "changedCount": 1,
+  "charged": 2,
+  "fresh": false,
+  "urls": [
+    {
+      "url": "https://competitor.com/pricing",
+      "status": "changed",
+      "title": "Pricing — Competitor",
+      "diff": {
+        "addedCount": 1,
+        "removedCount": 1,
+        "changeRatio": 0.021,
+        "addedSample": ["Pro plan — $49/month"],
+        "removedSample": ["Pro plan — $39/month"],
+        "numericOnly": true,
+        "titleChanged": false
+      }
+    },
+    {
+      "url": "https://competitor.com/changelog",
+      "status": "unchanged",
+      "title": "Changelog — Competitor"
+    }
+  ]
+}`}
+            </Code>
+            <P>
+              Per-URL <InlineCode>status</InlineCode> is{" "}
+              <InlineCode>changed</InlineCode>,{" "}
+              <InlineCode>unchanged</InlineCode>,{" "}
+              <InlineCode>first_check</InlineCode> (baseline stored on this
+              poll — remaining URLs after register), or{" "}
+              <InlineCode>error</InlineCode> (the page could not be read
+              this time; the old baseline is kept). For changed pages you
+              get up to five added and five removed line samples, a{" "}
+              <InlineCode>changeRatio</InlineCode> (share of lines that
+              moved), and <InlineCode>numericOnly</InlineCode> —{" "}
+              <InlineCode>true</InlineCode> when every changed line differs
+              only in digits.
+            </P>
+            <P>
+              <InlineCode>GET /api/t/watch/status?id=</InlineCode> is free:
+              the registered URLs, note, poll count, and last-poll time — no
+              fetches, no credits.
+            </P>
+            <H3>Wallet path — hosted watch list</H3>
             <P>
               Watch the pages <em>you</em> care about. Register a list of 1
               to 20 URLs once (<InlineCode>POST /v2/watch</InlineCode>,{" "}
@@ -1592,7 +1894,7 @@ curl https://skim402.com/api/v2/dataset/ds_LviVNQtobY0pSEfxpRqB7K0O`}
               of the previous one return the cached result with{" "}
               <InlineCode>"fresh": true</InlineCode> instead of re-reading.
             </P>
-            <H3>Register</H3>
+            <H3>Register (wallet)</H3>
             <Code>
 {`curl -X POST https://skim402.com/api/v2/watch \\
   -H "Content-Type: application/json" \\
@@ -1619,7 +1921,7 @@ curl https://skim402.com/api/v2/dataset/ds_LviVNQtobY0pSEfxpRqB7K0O`}
               a bad list means a 4xx and no charge, same contract as the
               dataset builder.
             </P>
-            <H3>Poll for changes</H3>
+            <H3>Poll for changes (wallet)</H3>
             <Code>
 {`curl "https://skim402.com/api/v2/watch/diff?id=w_kF3nW8pQx2LmT9rYb6JcHd0V" \\
   -H "PAYMENT-SIGNATURE: <base64-payment-payload>"
@@ -1953,20 +2255,57 @@ const feed = await res.json();`}
                 query params: <InlineCode>stripLinks=true</InlineCode>,{" "}
                 <InlineCode>stripImages=true</InlineCode>.
               </Field>
-              <Field name="POST /t/read/batch" type="1 credit per URL">
+              <Field name="POST /t/read/batch" type="1 credit per successful URL">
                 Body{" "}
                 <InlineCode>{`{ "urls": [...], "stripLinks"?: bool, "stripImages"?: bool }`}</InlineCode>
-                , up to 10 URLs. Failed URLs in the batch are refunded
-                automatically.
+                , 1–10 URLs. Response is{" "}
+                <InlineCode>{`{ items, charged }`}</InlineCode> — per-URL{" "}
+                <InlineCode>ok</InlineCode> / <InlineCode>data</InlineCode> /{" "}
+                <InlineCode>error</InlineCode>. Failed URLs are not charged.
+                See{" "}
+                <a href="#batch" className="text-primary hover:underline">
+                  batch
+                </a>
+                .
               </Field>
               <Field name="POST /t/extract" type="8 credits">
                 Body{" "}
-                <InlineCode>{`{ "url", "schema", "instructions?" }`}</InlineCode>{" "}
-                — same schema-constrained extraction as{" "}
+                <InlineCode>{`{ "url", "schema", "instructions?" }`}</InlineCode>
+                . <InlineCode>schema</InlineCode> is required; put “main
+                table” or column hints in{" "}
+                <InlineCode>instructions</InlineCode>. Returns{" "}
+                <InlineCode>{`{ url, finalUrl, data }`}</InlineCode> — typed
+                JSON from the page only. Failed extracts are refunded. See{" "}
                 <a href="#extract" className="text-primary hover:underline">
-                  /v1/extract
+                  extract
                 </a>
                 .
+              </Field>
+              <Field name="POST /t/watch" type="1 credit on register">
+                Body{" "}
+                <InlineCode>{`{ "urls": [1–20], "note"? }`}</InlineCode>.
+                Returns{" "}
+                <InlineCode>{`{ watchId, urls, pollUrl, minIntervalSeconds, charged }`}</InlineCode>
+                . First URL is read before the watch is stored; unreadable
+                first URL is 422 and no watch. See{" "}
+                <a href="#watch" className="text-primary hover:underline">
+                  watch
+                </a>
+                .
+              </Field>
+              <Field name="GET /t/watch/diff" type="1 credit per successful URL">
+                Query <InlineCode>id</InlineCode>. Re-reads every URL and
+                returns per-URL{" "}
+                <InlineCode>changed</InlineCode> /{" "}
+                <InlineCode>unchanged</InlineCode> /{" "}
+                <InlineCode>first_check</InlineCode> /{" "}
+                <InlineCode>error</InlineCode>. Polls within 60s return{" "}
+                <InlineCode>{`{ fresh: true }`}</InlineCode> and are not
+                re-charged. Failed URLs are not charged.
+              </Field>
+              <Field name="GET /t/watch/status" type="free">
+                Query <InlineCode>id</InlineCode>. Metadata only — no
+                fetches.
               </Field>
               <H3>Signal polling</H3>
               <P>

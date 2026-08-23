@@ -64,8 +64,11 @@ const SECTIONS: Section[] = [
           <p>
             Clean markdown of the page's main content, a plain-text version,
             and structured metadata (title, author, published date, canonical
-            URL, word count). Need typed JSON instead of prose? Use{" "}
-            <InlineCode>/v1/extract</InlineCode> with your own schema.
+            URL, word count). Need typed JSON instead of prose?{" "}
+            <InlineCode>POST /api/t/extract</InlineCode> with a schema and a
+            short intent (see{" "}
+            <PageLink href="/docs#extract">extract</PageLink>
+            ).
           </p>
         ),
       },
@@ -110,9 +113,10 @@ const SECTIONS: Section[] = [
         q: "Can Skim crawl a whole site?",
         a: (
           <p>
-            No — one URL in, one clean read out. That keeps it fast and keeps
-            pricing simple. If you need many pages, your agent loops over the
-            URLs it cares about and pays per read.
+            Not a site-wide crawler. For several known URLs,{" "}
+            <PageLink href="/docs#batch">POST /api/t/read/batch</PageLink>{" "}
+            reads up to 10 in one request — 1 credit per successful URL,
+            partial success is fine.
           </p>
         ),
       },
@@ -138,11 +142,16 @@ const SECTIONS: Section[] = [
         q: "How much does each request cost?",
         a: (
           <p>
-            Paying per call: $0.002 per read, $0.015 per structured extract,
-            $0.005 per Signal poll. Paying by card: plans start free (1,000
-            reads a month) and go up from $15, where a standard read is one
-            credit. See <PageLink href="/pricing">pricing</PageLink> and{" "}
-            <PageLink href="/pricing">card plans</PageLink> for details.
+            Paying by card (recommended): a standard read is 1 credit; JS
+            fallback is 2; forced JS is 3; <PageLink href="/docs#batch">batch</PageLink>{" "}
+            is 1 per successful URL; <PageLink href="/docs#extract">extract</PageLink>{" "}
+            is 8; Signals are 2 per poll; watching a page is 1 credit per
+            successful URL fetch on <InlineCode>/t/watch</InlineCode>{" "}
+            (status is free). Paying per call:
+            $0.002 per read, $0.015 per extract, $0.005 per Signal poll,
+            $0.01 to register a hosted watch then $0.005 per poll. Plan
+            prices stay $0 / $15 / $45 / $250. See{" "}
+            <PageLink href="/pricing">pricing</PageLink>.
           </p>
         ),
       },
@@ -152,7 +161,25 @@ const SECTIONS: Section[] = [
           <p>
             No. Paying per call, payment settles only when a read succeeds —
             if a page can't be read, you don't pay. On card plans, failed
-            reads are refunded to your credit balance automatically.
+            reads are refunded to your credit balance automatically. Batch
+            charges only the URLs that succeeded. Failed extracts are
+            refunded.
+          </p>
+        ),
+      },
+      {
+        q: "Can I read several URLs, extract a table, or watch a page?",
+        a: (
+          <p>
+            Yes — same <InlineCode>sk402_</InlineCode> key.{" "}
+            <PageLink href="/docs#batch">Batch</PageLink> returns per-URL
+            markdown (cap 10). <PageLink href="/docs#extract">Extract</PageLink>{" "}
+            returns structured JSON from a schema plus an optional intent
+            like “main table”. <PageLink href="/docs#watch">Watch</PageLink>{" "}
+            is <InlineCode>POST /api/t/watch</InlineCode> then{" "}
+            <InlineCode>GET /api/t/watch/diff?id=</InlineCode> (1 credit per
+            successful URL fetch). Wallet path:{" "}
+            <InlineCode>POST /api/v2/watch</InlineCode>.
           </p>
         ),
       },

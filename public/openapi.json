@@ -4,7 +4,7 @@
     "title": "Skim",
     "version": "1.0.0",
     "description": "Skim \u2014 clean web reader for AI agents. Turns any URL into agent-ready Markdown (no nav, no ads, no boilerplate) plus structured metadata, in milliseconds \u2014 ~4x smaller than raw HTML, so agents pay for ~4x fewer input tokens. Default path: free API key (sk402_, 1,000 credits, no wallet) on /api/t/* endpoints. Optional path: pay per call in USDC via x402.",
-    "x-guidance": "Recommended: create a free sk402_ API key at https://skim402.com and call GET /api/t/read with Authorization: Bearer sk402_\u2026. Token-gated endpoints live under /api/t/*. Optional x402 path: Skim also exposes GET /api/v2/read (single URL \u2192 markdown), GET /api/v2/read/js (JS-rendered pages), POST /api/v2/read/batch (up to 10 URLs in one paid call), POST /api/v2/extract (URL + JSON Schema \u2192 schema-conforming JSON via LLM). Those endpoints return 402 Payment Required with x402 v2 payment details; sign the EIP-3009 USDC authorization with any x402 v2 client, retry, and you get the result. Pricing: $0.002 basic read, $0.005 JS render, $0.02 batch (10\u00d7 single), $0.015 structured extract \u2014 all settled in USDC on Base mainnet on the wallet path. Settlement happens only on 2xx responses, so failed reads are never charged. Identical v1 POST endpoints remain available for legacy clients at /api/v1/*.",
+    "x-guidance": "Recommended: create a free sk402_ API key at https://skim402.com and call GET /api/t/read with Authorization: Bearer sk402_\u2026 (1 credit). Agent features on the same key: POST /api/t/read/batch (1 credit per successful URL, max 10, response {items, charged}), POST /api/t/extract (8 credits, URL + JSON Schema + optional instructions), POST /api/t/watch then GET /api/t/watch/diff?id= (1 credit per successful URL fetch; GET /api/t/watch/status?id= is free). Optional x402 path: GET /api/v2/read ($0.002), GET /api/v2/read/js ($0.005), POST /api/v2/read/batch ($0.02), POST /api/v2/extract ($0.015), POST /api/v2/watch ($0.01) then GET /api/v2/watch/diff ($0.005). Settlement happens only on 2xx, so failed reads are never charged. Identical v1 POST endpoints remain at /api/v1/*.",
     "contact": {
       "name": "Skim",
       "url": "https://skim402.com"
@@ -327,7 +327,7 @@
       "post": {
         "operationId": "tokenReadBatch",
         "summary": "Batch read up to 10 URLs (card-lane token auth)",
-        "description": "1 credit per URL, debited up front; failed URLs are refunded automatically.",
+        "description": "1 credit per successful URL (max 10). Response is { items, charged }. Failed URLs are listed with ok:false and are not charged.",
         "tags": [
           "card"
         ],
@@ -368,7 +368,14 @@
         },
         "responses": {
           "200": {
-            "description": "Per-URL results with the credits actually charged"
+            "description": "Per-URL results with the credits actually charged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenReadBatchResult"
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or unknown token"
@@ -376,8 +383,8 @@
           "402": {
             "description": "Out of credits"
           },
-          "422": {
-            "description": "URL could not be fetched or had no readable content"
+          "400": {
+            "description": "Missing urls or more than 10 URLs"
           }
         }
       }
@@ -386,7 +393,7 @@
       "post": {
         "operationId": "tokenExtract",
         "summary": "Schema-constrained extraction (card-lane token auth)",
-        "description": "Same extraction as /api/v2/extract. Costs 8 credits; failed extractions are refunded.",
+        "description": "URL + JSON Schema + optional instructions (e.g. \"main table\"). Returns structured JSON from the page only. Costs 8 credits; failed extractions are refunded.",
         "tags": [
           "card"
         ],
@@ -425,7 +432,14 @@
         },
         "responses": {
           "200": {
-            "description": "Typed JSON matching the supplied schema"
+            "description": "Typed JSON matching the supplied schema",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractResult"
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or unknown token"
@@ -435,6 +449,249 @@
           },
           "422": {
             "description": "URL could not be fetched or had no readable content"
+          }
+        }
+      }
+    },
+    "/api/t/watch": {
+      "post": {
+        "operationId": "tokenWatchRegister",
+        "summary": "Register a hosted watch list (card-lane token auth)",
+        "description": "Registers 1\u201320 URLs. First URL is read before the watch is stored (1 credit on success). Unreadable first URL returns 422 and no watch. Returns a private watchId scoped to the creating key. Matches skim-mcp watch_urls.",
+        "tags": [
+          "card"
+        ],
+        "security": [
+          {
+            "skimToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenWatchBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Watch registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenWatchRegisterResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing urls or more than 20 URLs"
+          },
+          "401": {
+            "description": "Missing or unknown token"
+          },
+          "402": {
+            "description": "Out of credits"
+          },
+          "422": {
+            "description": "First URL could not be read \u2014 watch not created"
+          }
+        }
+      }
+    },
+    "/api/t/watch/diff": {
+      "get": {
+        "operationId": "tokenWatchDiff",
+        "summary": "Poll a hosted watch for changes (card-lane token auth)",
+        "description": "1 credit per successful URL fetch. Re-reads every URL and returns per-URL changed/unchanged/first_check/error plus a clean-text diff summary. Polls within 60 seconds return the cached result with fresh:true. Matches skim-mcp check_watch.",
+        "tags": [
+          "card"
+        ],
+        "security": [
+          {
+            "skimToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diff since last poll",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenWatchDiffResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unknown token"
+          },
+          "402": {
+            "description": "Out of credits"
+          },
+          "404": {
+            "description": "Unknown watch id"
+          }
+        }
+      }
+    },
+    "/api/t/watch/status": {
+      "get": {
+        "operationId": "tokenWatchStatus",
+        "summary": "Free watch metadata (card-lane token auth)",
+        "description": "Registered URLs, note, poll count, last-poll time. No fetches, no credits. Matches skim-mcp check_watch with status_only.",
+        "tags": [
+          "card"
+        ],
+        "security": [
+          {
+            "skimToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Watch status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenWatchStatusResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unknown token"
+          },
+          "404": {
+            "description": "Unknown watch id"
+          }
+        }
+      }
+    },
+    "/api/v2/watch": {
+      "post": {
+        "operationId": "watchRegisterV2",
+        "summary": "Register a hosted watch list (x402 wallet)",
+        "description": "Registers 1\u201320 URLs. Returns a private watchId. $0.01. Key-auth clients should use POST /api/t/watch instead.",
+        "tags": [
+          "watch"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "urls"
+                ],
+                "properties": {
+                  "urls": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Watch registered"
+          },
+          "402": {
+            "description": "Payment required"
+          }
+        }
+      }
+    },
+    "/api/v2/watch/diff": {
+      "get": {
+        "operationId": "watchDiffV2",
+        "summary": "Poll a hosted watch for changes (x402 wallet)",
+        "description": "$0.005 per poll. Re-reads every URL and returns per-URL changed/unchanged/first_check/error plus a clean-text diff summary.",
+        "tags": [
+          "watch"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Diff since last poll"
+          },
+          "402": {
+            "description": "Payment required"
+          },
+          "404": {
+            "description": "Unknown watch id"
+          }
+        }
+      }
+    },
+    "/api/v2/watch/status": {
+      "get": {
+        "operationId": "watchStatusV2",
+        "summary": "Free watch metadata (x402 wallet)",
+        "description": "Registered URLs, note, poll count, last-poll time. No payment.",
+        "tags": [
+          "watch"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Watch status"
+          },
+          "404": {
+            "description": "Unknown watch id"
           }
         }
       }
@@ -561,6 +818,71 @@
           }
         }
       },
+      "TokenReadBatchResult": {
+        "type": "object",
+        "required": [
+          "items",
+          "charged"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "url",
+                "ok",
+                "data",
+                "cacheHit",
+                "error"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ReadResult"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "cacheHit": {
+                  "type": "boolean"
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "integer"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "charged": {
+            "type": "integer",
+            "description": "Credits actually spent \u2014 equal to the number of successful URLs."
+          }
+        }
+      },
       "ReadBatchResult": {
         "type": "object",
         "required": [
@@ -643,7 +965,7 @@
           },
           "instructions": {
             "type": "string",
-            "description": "Optional natural-language guidance for the extractor."
+            "description": "Optional short intent or column hints (e.g. \"main table\")."
           }
         }
       },
@@ -673,6 +995,187 @@
                 "type": "integer"
               }
             }
+          }
+        }
+      },
+      "TokenWatchBody": {
+        "type": "object",
+        "required": [
+          "urls"
+        ],
+        "properties": {
+          "urls": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      "TokenWatchRegisterResult": {
+        "type": "object",
+        "required": [
+          "watchId",
+          "urls",
+          "pollUrl",
+          "minIntervalSeconds"
+        ],
+        "properties": {
+          "watchId": {
+            "type": "string"
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "pollUrl": {
+            "type": "string"
+          },
+          "minIntervalSeconds": {
+            "type": "integer"
+          },
+          "charged": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "TokenWatchDiffResult": {
+        "type": "object",
+        "required": [
+          "watchId",
+          "polledAt",
+          "changedCount",
+          "urls"
+        ],
+        "properties": {
+          "watchId": {
+            "type": "string"
+          },
+          "polledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "changedCount": {
+            "type": "integer"
+          },
+          "charged": {
+            "type": "integer"
+          },
+          "fresh": {
+            "type": "boolean"
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "url",
+                "status"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "changed",
+                    "unchanged",
+                    "first_check",
+                    "error"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "diff": {
+                  "type": "object",
+                  "properties": {
+                    "addedCount": {
+                      "type": "integer"
+                    },
+                    "removedCount": {
+                      "type": "integer"
+                    },
+                    "changeRatio": {
+                      "type": "number"
+                    },
+                    "addedSample": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removedSample": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "numericOnly": {
+                      "type": "boolean"
+                    },
+                    "titleChanged": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "TokenWatchStatusResult": {
+        "type": "object",
+        "required": [
+          "watchId",
+          "urls",
+          "minIntervalSeconds"
+        ],
+        "properties": {
+          "watchId": {
+            "type": "string"
+          },
+          "urls": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "pollCount": {
+            "type": "integer"
+          },
+          "lastPollAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "minIntervalSeconds": {
+            "type": "integer"
           }
         }
       }

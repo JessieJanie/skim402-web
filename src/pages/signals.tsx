@@ -268,13 +268,12 @@ export default function Signals() {
                 POST /t/watch · GET /t/watch/diff
               </code>
               <p className="text-sm text-muted-foreground leading-relaxed mb-3 flex-1">
-                Your own private Signal. Register the exact pages your agent
-                cares about — pricing pages, docs, a competitor's changelog —
-                then ask "what changed?" whenever you like. You get clean
-                line-level diffs of the actual content, not raw HTML noise.
-                Use the same API key as Signals and reads: 4 credits to
-                register up to 20 URLs, then 2 credits per check. Wallet
-                pay-per-poll is available too.
+                Your own private Signal. With an API key, register 1–20 URLs
+                at <code className="font-mono text-[11px]">POST /t/watch</code>{" "}
+                and poll <code className="font-mono text-[11px]">GET /t/watch/diff?id=</code>{" "}
+                — 1 credit per successful fetch. Wallet pay uses{" "}
+                <code className="font-mono text-[11px]">POST /v2/watch</code>{" "}
+                ($0.01) then $0.005 per poll. No email alerts.
               </p>
               <p className="text-xs text-muted-foreground/80 mb-4">
                 Sources: any pages you choose

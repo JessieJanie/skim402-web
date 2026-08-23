@@ -60,17 +60,6 @@ const routes = [
       "Try one page, several pages, extract a table, or watch a page — no curl required.",
   },
   {
-    path: "/workbench",
-    outFile: "workbench/index.html",
-    noSitemap: true,
-    title: "Reader Workbench | Skim",
-    description:
-      "Try Skim in the browser: one page, several pages, extract a table, or watch a page for changes. Uses the same free trial key as a single read.",
-    ogTitle: "Reader Workbench | Skim",
-    ogDescription:
-      "Try one page, several pages, extract a table, or watch a page — no curl required.",
-  },
-  {
     path: "/pricing",
     outFile: "pricing/index.html",
     lastmod: "2026-08-17",

@@ -1,0 +1,13 @@
+{
+  "x402": "1.0",
+  "name": "Skim",
+  "description": "Clean web reader for AI agents. Two ways to pay: card plan with API key (free tier 1,000 reads/month, skim402.com/pricing) or x402 wallet pay-per-call ($0.002 USDC on Base, no account needed).",
+  "capabilities": ["read", "content", "markdown", "extract", "scrape", "watch", "monitor", "diff"],
+  "pricing": { "currency": "USDC", "base": "0.002", "unit": "request" },
+  "payment": {
+    "address": "0x63AE98f3363B346a94Fcc1CBcB621F1C2B1Fcddc",
+    "chain": "base",
+    "facilitator": "https://api.cdp.coinbase.com/platform/v2/x402"
+  },
+  "endpoint": "https://skim402.com/api/v2/read"
+}

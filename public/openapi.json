@@ -1,0 +1,689 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Skim",
+    "version": "1.0.0",
+    "description": "Skim \u2014 clean web reader for AI agents. Turns any URL into agent-ready Markdown (no nav, no ads, no boilerplate) plus structured metadata, in milliseconds \u2014 ~4x smaller than raw HTML, so agents pay for ~4x fewer input tokens. Pay per call in USDC via x402. No signup, no API keys, no monthly bills.",
+    "x-guidance": "Skim exposes four x402 v2 endpoints for agents: GET /api/v2/read (single URL \u2192 markdown), GET /api/v2/read/js (JS-rendered pages), POST /api/v2/read/batch (up to 10 URLs in one paid call), POST /api/v2/extract (URL + JSON Schema \u2192 schema-conforming JSON via LLM). Every endpoint returns 402 Payment Required with x402 v2 payment details; sign the EIP-3009 USDC authorization with any x402 v2 client, retry, and you get the result. Pricing: $0.002 basic read, $0.005 JS render, $0.02 batch (10\u00d7 single), $0.015 structured extract \u2014 all settled in USDC on Base mainnet. No account, no API key, no rate-limit-by-tier \u2014 your wallet is your identity. Settlement happens only on 2xx responses, so failed reads are never charged. Identical v1 POST endpoints remain available for legacy clients at /api/v1/*.",
+    "contact": {
+      "name": "Skim",
+      "url": "https://skim402.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://skim402.com",
+      "description": "Production"
+    }
+  ],
+  "paths": {
+    "/api/v2/read": {
+      "get": {
+        "operationId": "readUrlV2",
+        "summary": "Read a URL (x402 v2 protocol, GET shape)",
+        "description": "Single-URL clean reader. Returns agent-ready Markdown + structured metadata.",
+        "tags": [
+          "reader"
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.002"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "The fully-qualified http(s) URL of the page to read."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clean reader output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required"
+          },
+          "422": {
+            "description": "URL could not be fetched or had no readable content"
+          }
+        }
+      }
+    },
+    "/api/v2/read/js": {
+      "get": {
+        "operationId": "readUrlJsV2",
+        "summary": "Read a JS-rendered URL (x402 v2 protocol, GET shape)",
+        "description": "Same output as /api/v2/read, but performs a full headless browser render first \u2014 for SPAs, JS-gated content, and lazy-loaded pages.",
+        "tags": [
+          "reader"
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.005"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "The fully-qualified http(s) URL of the JS-rendered page to read."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clean reader output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required"
+          },
+          "422": {
+            "description": "URL could not be fetched or had no readable content"
+          },
+          "503": {
+            "description": "JS rendering not configured on this instance"
+          }
+        }
+      }
+    },
+    "/api/v2/read/batch": {
+      "post": {
+        "operationId": "readUrlBatchV2",
+        "summary": "Batch read up to 10 URLs (x402 v2 protocol)",
+        "description": "Reads up to 10 URLs in parallel and returns per-URL results. One paid call covers the whole batch. Partial-success batches still settle; all-fail batches return 422 (no payment settled).",
+        "tags": [
+          "reader"
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.02"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadBatchBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-URL results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadBatchResult"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required"
+          },
+          "422": {
+            "description": "All URLs failed \u2014 no payment settled"
+          }
+        }
+      }
+    },
+    "/api/v2/extract": {
+      "post": {
+        "operationId": "extractUrlV2",
+        "summary": "Extract structured JSON from a URL (x402 v2 protocol)",
+        "description": "Fetches and cleans the URL, then runs a constrained LLM extraction against the caller-supplied JSON Schema. Returns schema-conforming JSON.",
+        "tags": [
+          "reader"
+        ],
+        "x-payment-info": {
+          "price": {
+            "mode": "fixed",
+            "currency": "USD",
+            "amount": "0.015"
+          },
+          "protocols": [
+            {
+              "x402": {}
+            }
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtractBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Schema-conforming extracted JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractResult"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required"
+          },
+          "422": {
+            "description": "URL could not be fetched or extraction produced no result"
+          },
+          "503": {
+            "description": "Structured extraction not configured on this instance"
+          }
+        }
+      }
+    },
+    "/api/t/read": {
+      "get": {
+        "operationId": "tokenReadUrl",
+        "summary": "Read a URL (card-lane token auth)",
+        "description": "Same clean reader as /api/v2/read, paid with plan/pack credits (1 credit; automatic browser fallback costs 1 extra credit). Failed reads are refunded.",
+        "tags": [
+          "card"
+        ],
+        "security": [
+          {
+            "skimToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "The fully-qualified http(s) URL of the page to read."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clean reader output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unknown token"
+          },
+          "402": {
+            "description": "Out of credits"
+          },
+          "422": {
+            "description": "URL could not be fetched or had no readable content"
+          }
+        }
+      }
+    },
+    "/api/t/read/js": {
+      "get": {
+        "operationId": "tokenReadUrlJs",
+        "summary": "Browser-rendered read (card-lane token auth)",
+        "description": "Forced headless-browser render, same response shape as /api/t/read. Costs 3 credits; failed reads are refunded.",
+        "tags": [
+          "card"
+        ],
+        "security": [
+          {
+            "skimToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            },
+            "description": "The fully-qualified http(s) URL of the page to read."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Clean reader output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or unknown token"
+          },
+          "402": {
+            "description": "Out of credits"
+          },
+          "422": {
+            "description": "URL could not be fetched or had no readable content"
+          }
+        }
+      }
+    },
+    "/api/t/read/batch": {
+      "post": {
+        "operationId": "tokenReadBatch",
+        "summary": "Batch read up to 10 URLs (card-lane token auth)",
+        "description": "1 credit per URL, debited up front; failed URLs are refunded automatically.",
+        "tags": [
+          "card"
+        ],
+        "security": [
+          {
+            "skimToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "urls"
+                ],
+                "properties": {
+                  "urls": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "minItems": 1,
+                    "maxItems": 10
+                  },
+                  "stripLinks": {
+                    "type": "boolean"
+                  },
+                  "stripImages": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-URL results with the credits actually charged"
+          },
+          "401": {
+            "description": "Missing or unknown token"
+          },
+          "402": {
+            "description": "Out of credits"
+          },
+          "422": {
+            "description": "URL could not be fetched or had no readable content"
+          }
+        }
+      }
+    },
+    "/api/t/extract": {
+      "post": {
+        "operationId": "tokenExtract",
+        "summary": "Schema-constrained extraction (card-lane token auth)",
+        "description": "Same extraction as /api/v2/extract. Costs 8 credits; failed extractions are refunded.",
+        "tags": [
+          "card"
+        ],
+        "security": [
+          {
+            "skimToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url",
+                  "schema"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "schema": {
+                    "type": "object",
+                    "description": "JSON Schema the output must match"
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Typed JSON matching the supplied schema"
+          },
+          "401": {
+            "description": "Missing or unknown token"
+          },
+          "402": {
+            "description": "Out of credits"
+          },
+          "422": {
+            "description": "URL could not be fetched or had no readable content"
+          }
+        }
+      }
+    },
+    "/api/card/account": {
+      "get": {
+        "operationId": "cardAccount",
+        "summary": "Card-lane account status",
+        "description": "Plan, status, remaining monthly and pack credits, pending overage, and the credit-cost table. Free.",
+        "tags": [
+          "card"
+        ],
+        "security": [
+          {
+            "skimToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account status"
+          },
+          "401": {
+            "description": "Missing or unknown token"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ReadResult": {
+        "type": "object",
+        "required": [
+          "url",
+          "finalUrl",
+          "mode",
+          "markdown",
+          "text",
+          "metadata"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL as supplied by the caller."
+          },
+          "finalUrl": {
+            "type": "string",
+            "description": "URL after redirects."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "basic",
+              "js"
+            ],
+            "description": "Reader mode used to produce this result."
+          },
+          "markdown": {
+            "type": "string",
+            "description": "Cleaned article body as Markdown."
+          },
+          "text": {
+            "type": "string",
+            "description": "Plain-text fallback."
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "nullable": true
+              },
+              "byline": {
+                "type": "string",
+                "nullable": true
+              },
+              "siteName": {
+                "type": "string",
+                "nullable": true
+              },
+              "publishedAt": {
+                "type": "string",
+                "nullable": true,
+                "description": "Published date as supplied by the page (typically ISO 8601)."
+              },
+              "excerpt": {
+                "type": "string",
+                "nullable": true
+              },
+              "lang": {
+                "type": "string",
+                "nullable": true
+              },
+              "length": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Approximate character length of the extracted article body."
+              }
+            }
+          }
+        }
+      },
+      "ReadBatchBody": {
+        "type": "object",
+        "required": [
+          "urls"
+        ],
+        "properties": {
+          "urls": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "basic"
+            ],
+            "default": "basic"
+          }
+        }
+      },
+      "ReadBatchResult": {
+        "type": "object",
+        "required": [
+          "results",
+          "fetchedAt"
+        ],
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "url",
+                "ok",
+                "data",
+                "cacheHit",
+                "error"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "data": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ReadResult"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "cacheHit": {
+                  "type": "boolean"
+                },
+                "error": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "integer"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExtractBody": {
+        "type": "object",
+        "required": [
+          "url",
+          "schema"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "schema": {
+            "type": "object",
+            "description": "JSON Schema describing the desired output shape."
+          },
+          "instructions": {
+            "type": "string",
+            "description": "Optional natural-language guidance for the extractor."
+          }
+        }
+      },
+      "ExtractResult": {
+        "type": "object",
+        "required": [
+          "data",
+          "source"
+        ],
+        "properties": {
+          "data": {
+            "description": "JSON conforming to the supplied schema."
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "finalUrl": {
+                "type": "string"
+              },
+              "readerCacheHit": {
+                "type": "boolean"
+              },
+              "markdownBytes": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "skimToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "sk402_...",
+        "description": "Card-lane API token issued at checkout (skim402.com/card). Shown once on the success page. Also accepted via the x-skim-token header."
+      }
+    }
+  }
+}

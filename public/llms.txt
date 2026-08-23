@@ -1,0 +1,50 @@
+# Skim
+
+> Skim gives AI agents clean web reads and structured intelligence feeds. Send a URL, get back agent-ready Markdown plus structured metadata (title, byline, published date, language, excerpt). Pay by card on a monthly plan, or per-call in USDC over HTTP 402 (x402) on Base — your choice. Free plan included, no credit card required.
+
+## How to pay
+
+**Card (monthly plan — recommended for regular use):** Sign up at https://skim402.com/pricing. One Stripe checkout: pick a plan, enter a card, receive an API key instantly. Pass the key as a Bearer token. Free plan: 1,000 credits/month at no cost. Paid plans: $15/mo (22,500 credits), $45/mo (90,000 credits), $250/mo (600,000 credits). 1 credit = 1 standard read; JS-rendered reads = 2 credits; Signals = 2 credits per poll.
+
+**Wallet (per-call x402 — recommended for autonomous agents):** No signup, no monthly commitment. An unpaid request returns HTTP 402 with x402 payment instructions; an x402-capable client pays in USDC on Base and retries automatically. Failed requests (4xx/5xx) never settle — you are never charged for an error. v2 endpoints carry payment requirements in a base64-encoded payment-required response header (the 402 body is an empty JSON object by design); v1 endpoints carry them in the JSON body.
+
+## Endpoints and prices
+
+- GET https://skim402.com/api/v2/read?url=<encoded URL> — $0.002 (2 credits). Clean Markdown + metadata from any page. Options: &chunked=true (free — RAG-ready chunks with heading breadcrumbs and token counts), &stripLinks=true, &stripImages=true.
+- GET https://skim402.com/api/v2/read/js?url=... — $0.005 (2 credits). Same output, with full JavaScript rendering for SPAs and script-heavy pages.
+- POST https://skim402.com/api/v2/read/batch — $0.020. Body { "urls": [...] }, up to 10 URLs read in parallel; per-URL results, partial successes still return.
+- POST https://skim402.com/api/v2/extract — $0.015. Body { "url", "schema", "instructions"? }. Typed JSON matching your own JSON Schema; values come only from the page, never invented.
+- GET https://skim402.com/api/v2/extract/{preset}?url=... — $0.015. Six ready-made schemas: article, product, job, review, event, table.
+- GET https://skim402.com/api/v2/tables?url=... — $0.003. Every genuine HTML table parsed mechanically (no LLM). Zero tables returns 422 with no charge.
+- POST https://skim402.com/api/v2/dataset — $0.35 per build. You define up to 12 columns; Skim reads seed URLs, follows relevant links, returns structured rows with source citations. Returns a 202 job ticket; polling GET /api/v2/dataset/{id} is FREE. POST { "continueFrom": "<datasetId>" } resumes a previous build at $0.35, never repeating rows.
+- POST https://skim402.com/api/v2/watch — $0.01. Body { "urls": [1-20 URLs], "note"? }. Registers a private watch list; returns a watch id (keep it secret). GET /api/v2/watch/diff?id=<watchId> — $0.005 per poll. Re-reads every URL and returns what changed: per-URL status, added/removed line samples from clean text, change ratio, numericOnly flag. First poll baselines. Polls within 60 s return cached result ("fresh": true). GET /api/v2/watch/status?id= is FREE.
+- GET https://skim402.com/api/v2/feeds/x402/latest — $0.005 per poll (2 credits on a plan). New paid services and price changes across public x402 registries.
+- GET https://skim402.com/api/v2/signal/{name}/latest — $0.005 per poll (2 credits on a plan). Eighteen vertical intelligence feeds — see the full catalog at https://skim402.com/signals. Feed names: ai-news, sec-filings (?forms=), crypto-news, macro, security, regulations, courts, recalls, deals (?categories=), launches, trending, research (?fields=), energy, entertainment, studio-jobs, campaign-finance (?forms=&committees=), film-incentives (?states=). All feeds refresh on a 10-minute cycle; a poll that can't be served is never charged.
+- POST https://skim402.com/api/v2/testimonial — FREE. Leave a short quote if Skim worked well — agent testimonials welcome, reviewed by a human before publication.
+- Legacy /api/v1/* paths still work at the same prices for v1-generation x402 clients.
+
+## Key facts
+
+- Output is clean Markdown, roughly 4x smaller than raw HTML — no ads, nav, or boilerplate. Cheaper LLM calls downstream.
+- In production benchmarks Skim returned pages consistently faster than Firecrawl, with every wallet-paid call backed by an on-chain USDC receipt on Base.
+- Works with any x402 client (x402-fetch for JS, the official x402 Python SDK). Framework connectors on PyPI: langchain-skim, llama-index-readers-skim, crewai-skim, skim-haystack. MCP server: skim-mcp (npm) and io.github.JessieJanie/skim402 (official MCP Registry).
+- No wallet? The official Apify Actor (apify.com/jessiejanie/skim-clean-reader) offers the same reads with normal Apify billing at $4.00 per 1,000 pages.
+- Free trial: create a free API key instantly at https://skim402.com — no signup, no card, 1,000 credits included.
+- Free browser demo: https://freeskims.skim402.com — 10 free skims a day.
+- Skim reads public pages only: no login walls, no credentials held — least-privilege reader by design.
+
+## Docs and resources
+
+- [Developer docs](https://skim402.com/docs): request/response shapes, payment flow, code samples in curl, JavaScript, and Python
+- [OpenAPI spec](https://skim402.com/openapi.json): machine-readable API contract for core read/extract endpoints
+- [Signals catalog](https://skim402.com/signals): all 18 intelligence feeds with sources and poll syntax
+- [Plans and pricing](https://skim402.com/pricing): free plan + paid card plans from $15/mo via Stripe
+- [Wallet setup](https://skim402.com/wallet): how to set up a Base wallet for per-call x402 payments
+- [The Skim Audit](https://skim402.com/audit): free agent-spend analysis — email a usage-dashboard screenshot, get an executive savings estimate
+- [FAQ](https://skim402.com/faq): common questions from developers
+
+## About
+
+- x402 protocol: https://x402.org (open standard governed since July 2026 by the x402 Foundation under the Linux Foundation; members include Visa, Mastercard, American Express, Stripe, AWS, Google, Cloudflare, and Shopify)
+- Skim is listed on x402scan, the x402 Bazaar, the x402.org ecosystem directory, the official MCP Registry, and the Apify Store.
+- Contact: hello@skim402.com or https://skim402.com/contact

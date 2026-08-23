@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /sign-in
+Disallow: /sign-up
+Disallow: /api/
+
+Sitemap: https://skim402.com/sitemap.xml

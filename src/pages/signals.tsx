@@ -265,14 +265,15 @@ export default function Signals() {
                 </span>
               </div>
               <code className="font-mono text-xs text-muted-foreground mb-3 block">
-                GET /t/read · POST /v2/watch
+                POST /t/watch · GET /t/watch/diff
               </code>
               <p className="text-sm text-muted-foreground leading-relaxed mb-3 flex-1">
-                Your own private Signal. With an API key, re-read the page
-                and compare <code className="font-mono text-[11px]">receipt.contentHash</code>{" "}
-                — 1 credit per actual fetch, same as a normal read. Wallet
-                pay can register 1–20 URLs at <code className="font-mono text-[11px]">POST /v2/watch</code>{" "}
-                ($0.01) and poll diffs at $0.005. No email alerts.
+                Your own private Signal. With an API key, register 1–20 URLs
+                at <code className="font-mono text-[11px]">POST /t/watch</code>{" "}
+                and poll <code className="font-mono text-[11px]">GET /t/watch/diff?id=</code>{" "}
+                — 1 credit per successful fetch. Wallet pay uses{" "}
+                <code className="font-mono text-[11px]">POST /v2/watch</code>{" "}
+                ($0.01) then $0.005 per poll. No email alerts.
               </p>
               <p className="text-xs text-muted-foreground/80 mb-4">
                 Sources: any pages you choose

@@ -25,7 +25,7 @@ const sections: Section[] = [
   { id: "presets", label: "Extraction presets" },
   { id: "tables", label: "POST /v1/tables" },
   { id: "dataset", label: "POST /v2/dataset" },
-  { id: "watch", label: "Watch a page" },
+  { id: "watch", label: "POST /t/watch" },
   { id: "feed", label: "GET /v2/feeds/x402/latest" },
   { id: "signals", label: "Skim Signal series" },
   { id: "card", label: "Pay by card (token auth)" },
@@ -346,8 +346,8 @@ export default function Docs() {
                   </tr>
                   <tr>
                     <td className="px-5 py-3 font-medium">Watch a page</td>
-                    <td className="px-5 py-3 font-mono text-xs">GET /api/t/read + contentHash</td>
-                    <td className="px-5 py-3 text-muted-foreground">1 credit per actual fetch</td>
+                    <td className="px-5 py-3 font-mono text-xs">POST /api/t/watch · GET /diff · GET /status</td>
+                    <td className="px-5 py-3 text-muted-foreground">1 per successful URL fetch; status free</td>
                     <td className="px-5 py-3 font-mono text-xs">POST /api/v2/watch · $0.01, then $0.005/poll</td>
                   </tr>
                 </tbody>
@@ -400,7 +400,7 @@ export default function Docs() {
             </div>
 
             <P>
-              The token-gated endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/js</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/batch</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/extract</code>) require an API key and use credit billing. The x402 endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read/js</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v2/watch</code>, etc.) require no key — each call is paid in USDC at the moment it succeeds.
+              The token-gated endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/js</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/batch</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/extract</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/watch</code>) require an API key and use credit billing. The x402 endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read/js</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v2/watch</code>, etc.) require no key — each call is paid in USDC at the moment it succeeds.
             </P>
 
             {/* ── Quickstart ─────────────────────────────────────────── */}
@@ -529,13 +529,21 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # for the MCP server below`}
               on a shared free tier with no wallet.
             </P>
             <P>
-              The local <InlineCode>skim-mcp</InlineCode> server is the optional
-              x402 path. It wraps Skim&apos;s <InlineCode>/v1/read</InlineCode>{" "}
-              endpoint, signs each payment from a Base wallet, and exposes a
-              single <InlineCode>read_url</InlineCode> tool. That path still
-              uses <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> — a fresh
-              wallet with a little USDC, not your personal one. A dollar funds
-              ~500 reads.
+              The local <InlineCode>skim-mcp</InlineCode> server prefers a
+              key when <InlineCode>SKIM_API_KEY</InlineCode> is set:{" "}
+              <InlineCode>read_url</InlineCode>,{" "}
+              <InlineCode>read_urls</InlineCode>,{" "}
+              <InlineCode>extract_url</InlineCode>,{" "}
+              <InlineCode>watch_urls</InlineCode>, and{" "}
+              <InlineCode>check_watch</InlineCode> hit{" "}
+              <InlineCode>/api/t/read</InlineCode>,{" "}
+              <InlineCode>/api/t/read/batch</InlineCode>,{" "}
+              <InlineCode>/api/t/extract</InlineCode>, and{" "}
+              <InlineCode>/api/t/watch*</InlineCode>. Without a key it is the
+              optional x402 path —{" "}
+              <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> on a fresh
+              Base wallet with a little USDC, not your personal one. A dollar
+              funds ~500 reads.
             </P>
 
             <H3>Remote connector (no install)</H3>
@@ -1762,44 +1770,109 @@ curl https://skim402.com/api/v2/dataset/ds_LviVNQtobY0pSEfxpRqB7K0O`}
 
             <H2 id="watch">Watch a page</H2>
             <P>
-              Durable v1: store the last clean snapshot, then compare on the
-              next fetch. Credit only on actual reads. No email, no cron
-              platform — your agent polls when it wants.
+              Register 1–20 URLs, then poll for what changed. Same credit
+              ledger as a single read — 1 credit per successful fetch.
+              Status is free. No email, no cron — your agent polls when it
+              wants. These are the paths{" "}
+              <InlineCode>skim-mcp</InlineCode> uses for{" "}
+              <InlineCode>watch_urls</InlineCode> and{" "}
+              <InlineCode>check_watch</InlineCode> when{" "}
+              <InlineCode>SKIM_API_KEY</InlineCode> is set.
             </P>
-            <H3>API key — compare to last snapshot</H3>
+            <H3>API key — POST /api/t/watch</H3>
             <P>
-              There is no separate <InlineCode>/t/watch</InlineCode> route.
-              Use the same <InlineCode>GET /api/t/read</InlineCode> you
-              already pay 1 credit for. Each successful read includes{" "}
-              <InlineCode>receipt.contentHash</InlineCode> (SHA-256 of the
-              extracted text) plus <InlineCode>metadata.excerpt</InlineCode>.
-              Persist those on your side; next poll, read again and compare.
-              Same hash → unchanged. Different hash → use the new markdown
-              as a diff summary. Failed reads are refunded, so a down page
-              does not burn a credit.
+              Auth is <InlineCode>Authorization: Bearer sk402_…</InlineCode>{" "}
+              (or <InlineCode>x-skim-token</InlineCode>). Register with{" "}
+              <InlineCode>POST /api/t/watch</InlineCode>, poll with{" "}
+              <InlineCode>GET /api/t/watch/diff?id=</InlineCode>, metadata
+              with <InlineCode>GET /api/t/watch/status?id=</InlineCode>.
+              Register validates the first URL via{" "}
+              <InlineCode>/t/read</InlineCode> before creating the watch (1
+              credit on success). An unreadable first URL returns{" "}
+              <InlineCode>422</InlineCode> and no watch is stored. Each
+              successful URL fetch on a diff costs 1 credit; failed URLs
+              come back as <InlineCode>error</InlineCode> and are not
+              charged. Polls within 60 seconds return the cached result with{" "}
+              <InlineCode>"fresh": true</InlineCode>. The{" "}
+              <InlineCode>watchId</InlineCode> is scoped to the creating key
+              — treat it like a bearer secret.
             </P>
+            <H3>Register</H3>
             <Code>
-{`# 1. Baseline (1 credit). Save contentHash + excerpt (or full markdown).
-curl -s -H "Authorization: Bearer sk402_YOUR_KEY" \\
-  "https://skim402.com/api/t/read?url=https://example.com/pricing" \\
-  | jq '{title: .metadata.title, excerpt: .metadata.excerpt, contentHash: .receipt.contentHash}'
+{`curl -X POST https://skim402.com/api/t/watch \\
+  -H "Authorization: Bearer sk402_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "urls": [
+      "https://competitor.com/pricing",
+      "https://competitor.com/changelog"
+    ],
+    "note": "competitor pricing + changelog"
+  }'
+
+# -> 201
+{
+  "watchId": "w_kF3nW8pQx2LmT9rYb6JcHd0V",
+  "urls": ["https://competitor.com/pricing", "https://competitor.com/changelog"],
+  "note": "competitor pricing + changelog",
+  "pollUrl": "/api/t/watch/diff?id=w_kF3nW8pQx2LmT9rYb6JcHd0V",
+  "minIntervalSeconds": 60,
+  "charged": 1
+}`}
+            </Code>
+            <H3>Poll for changes</H3>
+            <Code>
+{`curl "https://skim402.com/api/t/watch/diff?id=w_kF3nW8pQx2LmT9rYb6JcHd0V" \\
+  -H "Authorization: Bearer sk402_YOUR_KEY"
 
 # -> 200
 {
-  "title": "Pricing",
-  "excerpt": "Pro plan — $39/month",
-  "contentHash": "25b9c4cfa6f380f477c8e7ed991eba7ec9b2450fd3c76f40e1019150b1efc323"
-}
-
-# 2. Later: read again (1 credit) and compare contentHash.
-#    Same hash → unchanged. Different hash → page changed.
-# 3. List watches = your stored URL + last hash + last excerpt.`}
+  "watchId": "w_kF3nW8pQx2LmT9rYb6JcHd0V",
+  "polledAt": "2026-07-14T12:00:00Z",
+  "changedCount": 1,
+  "charged": 2,
+  "fresh": false,
+  "urls": [
+    {
+      "url": "https://competitor.com/pricing",
+      "status": "changed",
+      "title": "Pricing — Competitor",
+      "diff": {
+        "addedCount": 1,
+        "removedCount": 1,
+        "changeRatio": 0.021,
+        "addedSample": ["Pro plan — $49/month"],
+        "removedSample": ["Pro plan — $39/month"],
+        "numericOnly": true,
+        "titleChanged": false
+      }
+    },
+    {
+      "url": "https://competitor.com/changelog",
+      "status": "unchanged",
+      "title": "Changelog — Competitor"
+    }
+  ]
+}`}
             </Code>
             <P>
-              That is the whole key-auth watch: your store holds the last
-              snapshot, Skim charges only when it actually fetches. Browser
-              fallback on a read still follows the existing rule (2 credits
-              total when <InlineCode>X-Skim-Fallback: js</InlineCode>).
+              Per-URL <InlineCode>status</InlineCode> is{" "}
+              <InlineCode>changed</InlineCode>,{" "}
+              <InlineCode>unchanged</InlineCode>,{" "}
+              <InlineCode>first_check</InlineCode> (baseline stored on this
+              poll — remaining URLs after register), or{" "}
+              <InlineCode>error</InlineCode> (the page could not be read
+              this time; the old baseline is kept). For changed pages you
+              get up to five added and five removed line samples, a{" "}
+              <InlineCode>changeRatio</InlineCode> (share of lines that
+              moved), and <InlineCode>numericOnly</InlineCode> —{" "}
+              <InlineCode>true</InlineCode> when every changed line differs
+              only in digits.
+            </P>
+            <P>
+              <InlineCode>GET /api/t/watch/status?id=</InlineCode> is free:
+              the registered URLs, note, poll count, and last-poll time — no
+              fetches, no credits.
             </P>
             <H3>Wallet path — hosted watch list</H3>
             <P>
@@ -1821,7 +1894,7 @@ curl -s -H "Authorization: Bearer sk402_YOUR_KEY" \\
               of the previous one return the cached result with{" "}
               <InlineCode>"fresh": true</InlineCode> instead of re-reading.
             </P>
-            <H3>Register</H3>
+            <H3>Register (wallet)</H3>
             <Code>
 {`curl -X POST https://skim402.com/api/v2/watch \\
   -H "Content-Type: application/json" \\
@@ -1848,7 +1921,7 @@ curl -s -H "Authorization: Bearer sk402_YOUR_KEY" \\
               a bad list means a 4xx and no charge, same contract as the
               dataset builder.
             </P>
-            <H3>Poll for changes</H3>
+            <H3>Poll for changes (wallet)</H3>
             <Code>
 {`curl "https://skim402.com/api/v2/watch/diff?id=w_kF3nW8pQx2LmT9rYb6JcHd0V" \\
   -H "PAYMENT-SIGNATURE: <base64-payment-payload>"
@@ -2208,15 +2281,31 @@ const feed = await res.json();`}
                 </a>
                 .
               </Field>
-              <Field name="GET /t/read (watch)" type="1 credit per fetch">
-                No hosted <InlineCode>/t/watch</InlineCode>. Compare{" "}
-                <InlineCode>receipt.contentHash</InlineCode> across reads to
-                see if a page changed; store the last hash/excerpt yourself.
-                See{" "}
+              <Field name="POST /t/watch" type="1 credit on register">
+                Body{" "}
+                <InlineCode>{`{ "urls": [1–20], "note"? }`}</InlineCode>.
+                Returns{" "}
+                <InlineCode>{`{ watchId, urls, pollUrl, minIntervalSeconds, charged }`}</InlineCode>
+                . First URL is read before the watch is stored; unreadable
+                first URL is 422 and no watch. See{" "}
                 <a href="#watch" className="text-primary hover:underline">
                   watch
                 </a>
                 .
+              </Field>
+              <Field name="GET /t/watch/diff" type="1 credit per successful URL">
+                Query <InlineCode>id</InlineCode>. Re-reads every URL and
+                returns per-URL{" "}
+                <InlineCode>changed</InlineCode> /{" "}
+                <InlineCode>unchanged</InlineCode> /{" "}
+                <InlineCode>first_check</InlineCode> /{" "}
+                <InlineCode>error</InlineCode>. Polls within 60s return{" "}
+                <InlineCode>{`{ fresh: true }`}</InlineCode> and are not
+                re-charged. Failed URLs are not charged.
+              </Field>
+              <Field name="GET /t/watch/status" type="free">
+                Query <InlineCode>id</InlineCode>. Metadata only — no
+                fetches.
               </Field>
               <H3>Signal polling</H3>
               <P>

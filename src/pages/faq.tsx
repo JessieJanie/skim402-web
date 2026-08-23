@@ -146,7 +146,8 @@ const SECTIONS: Section[] = [
             fallback is 2; forced JS is 3; <PageLink href="/docs#batch">batch</PageLink>{" "}
             is 1 per successful URL; <PageLink href="/docs#extract">extract</PageLink>{" "}
             is 8; Signals are 2 per poll; watching a page is 1 credit per
-            actual <InlineCode>/t/read</InlineCode> fetch. Paying per call:
+            successful URL fetch on <InlineCode>/t/watch</InlineCode>{" "}
+            (status is free). Paying per call:
             $0.002 per read, $0.015 per extract, $0.005 per Signal poll,
             $0.01 to register a hosted watch then $0.005 per poll. Plan
             prices stay $0 / $15 / $45 / $250. See{" "}
@@ -175,9 +176,10 @@ const SECTIONS: Section[] = [
             markdown (cap 10). <PageLink href="/docs#extract">Extract</PageLink>{" "}
             returns structured JSON from a schema plus an optional intent
             like “main table”. <PageLink href="/docs#watch">Watch</PageLink>{" "}
-            compares <InlineCode>receipt.contentHash</InlineCode> across
-            reads (1 credit per fetch). Hosted watch lists are on the
-            wallet path at <InlineCode>POST /api/v2/watch</InlineCode>.
+            is <InlineCode>POST /api/t/watch</InlineCode> then{" "}
+            <InlineCode>GET /api/t/watch/diff?id=</InlineCode> (1 credit per
+            successful URL fetch). Wallet path:{" "}
+            <InlineCode>POST /api/v2/watch</InlineCode>.
           </p>
         ),
       },

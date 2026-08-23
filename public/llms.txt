@@ -4,7 +4,7 @@
 
 ## How to pay
 
-**API key (recommended):** Create a free key at https://skim402.com (1,000 credits, no wallet, no signup) or start the monthly Free Plan at https://skim402.com/pricing — card on file, never charged, 1,000 credits/month. Paid plans from $15/mo via Stripe. Pass the key as `Authorization: Bearer sk402_…` on `/api/t/*` endpoints. Credits (same ledger for every call): standard read = 1; JS fallback = 2; forced JS = 3; batch = 1 per successful URL (max 10); extract = 8; Signals = 2 per poll; watch = 1 per actual `/t/read` fetch. Failed reads/extracts are refunded.
+**API key (recommended):** Create a free key at https://skim402.com (1,000 credits, no wallet, no signup) or start the monthly Free Plan at https://skim402.com/pricing — card on file, never charged, 1,000 credits/month. Paid plans from $15/mo via Stripe. Pass the key as `Authorization: Bearer sk402_…` on `/api/t/*` endpoints. Credits (same ledger for every call): standard read = 1; JS fallback = 2; forced JS = 3; batch = 1 per successful URL (max 10); extract = 8; Signals = 2 per poll; watch = 1 per successful URL fetch on `/t/watch` (status is free). Failed reads/extracts are refunded.
 
 **Wallet (optional x402 path):** For agents that already hold USDC on Base. An unpaid request returns HTTP 402 with x402 payment instructions; an x402-capable client pays and retries automatically. Failed requests (4xx/5xx) never settle — you are never charged for an error. v2 endpoints carry payment requirements in a base64-encoded payment-required response header (the 402 body is an empty JSON object by design); v1 endpoints carry them in the JSON body.
 
@@ -12,7 +12,7 @@
 
 - POST https://skim402.com/api/t/read/batch — Authorization: Bearer sk402_…. Body { "urls": [1-10] }. Response { "items": [{ url, ok, data, error }], "charged": <successful count> }. 1 credit per successful URL; failed URLs uncharged.
 - POST https://skim402.com/api/t/extract — Body { "url", "schema", "instructions"? }. Structured JSON in `data` (e.g. table rows). 8 credits; refunded on failure. Values come only from the page.
-- Watch (key): GET https://skim402.com/api/t/read?url=… and compare `receipt.contentHash` + `metadata.excerpt` to your last snapshot. 1 credit per actual fetch. No /api/t/watch route.
+- Watch (key): POST https://skim402.com/api/t/watch — Authorization: Bearer sk402_…. Body { "urls": [1-20], "note"? }. Returns { watchId, urls, pollUrl, minIntervalSeconds, charged }. Then GET /api/t/watch/diff?id= (1 credit per successful URL fetch; polls within 60s return cached { fresh: true }). GET /api/t/watch/status?id= is free. Watch id is scoped to the creating key — keep it secret.
 - Watch (wallet): POST https://skim402.com/api/v2/watch — $0.01, body { "urls": [1-20], "note"? }. Then GET /api/v2/watch/diff?id= — $0.005 per poll. GET /api/v2/watch/status?id= is free.
 
 ## Endpoints and prices

@@ -373,9 +373,9 @@ export default function Home() {
               <p>URL + a short intent and a JSON schema. Structured rows come back — from the page, never invented. 8 credits.</p>
             </a>
             <a href="/docs#watch" className="skim-feature">
-              <span className="skim-feature-kicker">GET /api/t/read</span>
+              <span className="skim-feature-kicker">POST /api/t/watch</span>
               <h3>Watch a page</h3>
-              <p>Compare receipt.contentHash across reads. 1 credit per actual fetch. Hosted wallet watches if you want a watch id.</p>
+              <p>Register 1–20 URLs, then poll /watch/diff. 1 credit per successful fetch. Status is free.</p>
             </a>
           </div>
         </section>

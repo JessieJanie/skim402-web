@@ -362,9 +362,10 @@ curl -X POST https://skim402.com/api/v1/read \\
                 schema you provide (8 credits).
               </li>
               <li>
-                <strong>Did this page change?</strong> — compare{" "}
-                <code>receipt.contentHash</code> across{" "}
-                <code>GET /api/t/read</code> calls (1 credit per fetch).
+                <strong>Did this page change?</strong> —{" "}
+                <code>POST /api/t/watch</code> then{" "}
+                <code>GET /api/t/watch/diff?id=</code> (1 credit per
+                successful URL fetch).
               </li>
             </ul>
 

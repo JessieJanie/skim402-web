@@ -206,6 +206,7 @@ function ClerkProviderWithRoutes() {
             <Route path="/aup" component={AUP} />
             <Route path="/wallet" component={WalletPage} />
             <Route path="/playground" component={Playground} />
+            <Route path="/workbench" component={Playground} />
             <Route path="/articles" component={ArticlesIndex} />
             <Route path="/articles/saner-way-forward" component={SanerWayForward} />
             <Route path="/articles/your-agent-is-not-a-user" component={YourAgentIsNotAUser} />

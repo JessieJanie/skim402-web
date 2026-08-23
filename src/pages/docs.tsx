@@ -1957,20 +1957,24 @@ const feed = await res.json();`}
                 query params: <InlineCode>stripLinks=true</InlineCode>,{" "}
                 <InlineCode>stripImages=true</InlineCode>.
               </Field>
-              <Field name="POST /t/read/batch" type="1 credit per URL">
+              <Field name="POST /t/read/batch" type="1 credit per successful URL">
                 Body{" "}
                 <InlineCode>{`{ "urls": [...], "stripLinks"?: bool, "stripImages"?: bool }`}</InlineCode>
-                , up to 10 URLs. Failed URLs in the batch are refunded
-                automatically.
+                , up to 10 URLs. Response is{" "}
+                <InlineCode>{`{ items, charged }`}</InlineCode> — per-URL{" "}
+                <InlineCode>ok</InlineCode>/<InlineCode>data</InlineCode>/
+                <InlineCode>error</InlineCode>. Failed URLs are not charged.
               </Field>
-              <Field name="POST /t/extract" type="8 credits">
+              <Field name="POST /t/extract" type="8 credits on usable rows">
                 Body{" "}
                 <InlineCode>{`{ "url", "schema", "instructions?" }`}</InlineCode>{" "}
                 — same schema-constrained extraction as{" "}
                 <a href="#extract" className="text-primary hover:underline">
                   /v1/extract
                 </a>
-                .
+                . Failed extracts are refunded. An empty{" "}
+                <InlineCode>{`{ tables: [] }`}</InlineCode> is not a successful
+                extract — do not treat it as an 8-credit success.
               </Field>
               <H3>Signal polling</H3>
               <P>

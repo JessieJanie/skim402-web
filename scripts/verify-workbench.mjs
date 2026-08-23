@@ -1,0 +1,157 @@
+// Contract checks for Workbench mapping — mirrors src/pages/playground.tsx helpers.
+// Run: node scripts/verify-workbench.mjs
+
+function asRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+function flagOk(value) {
+  if (typeof value === "boolean") return value;
+  if (value === "true" || value === 1) return true;
+  if (value === "false" || value === 0) return false;
+  return null;
+}
+
+function normalizeBatchItem(value, fallbackUrl) {
+  if (typeof value === "string") {
+    return { url: value, ok: false, error: "This URL could not be read." };
+  }
+  const rec = asRecord(value);
+  if (!rec) return { url: fallbackUrl, ok: false, error: "This URL could not be read." };
+  const dataRec = asRecord(rec.data);
+  const markdown =
+    (typeof dataRec?.markdown === "string" && dataRec.markdown) ||
+    (typeof rec.markdown === "string" && rec.markdown) ||
+    "";
+  const data = dataRec ?? (markdown ? { markdown } : null);
+  const explicitOk = flagOk(rec.ok) ?? flagOk(rec.success);
+  const hasError = rec.error != null && rec.error !== "";
+  const ok = explicitOk ?? (Boolean(markdown) && !hasError);
+  const url = typeof rec.url === "string" && rec.url ? rec.url : fallbackUrl;
+  return {
+    url,
+    ok,
+    data: data ?? undefined,
+    error: ok
+      ? null
+      : typeof rec.error === "string" || (rec.error && typeof rec.error === "object")
+        ? rec.error
+        : "This URL could not be read.",
+  };
+}
+
+function batchItemsFromBody(body, urls) {
+  const rec = asRecord(body);
+  const raw = Array.isArray(rec?.items)
+    ? rec.items
+    : Array.isArray(rec?.results)
+      ? rec.results
+      : Array.isArray(rec?.pages)
+        ? rec.pages
+        : Array.isArray(body)
+          ? body
+          : [];
+  if (raw.length === 0) {
+    return urls.map((url) => ({ url, ok: false, error: "No per-URL results in this response." }));
+  }
+  return raw.map((item, index) => normalizeBatchItem(item, urls[index] ?? ""));
+}
+
+function normalizeTable(value) {
+  const rec = asRecord(value);
+  if (!rec) return null;
+  const headers = Array.isArray(rec.headers) ? rec.headers.map((cell) => (cell == null ? "" : String(cell))) : [];
+  const rows = Array.isArray(rec.rows)
+    ? rec.rows.map((row) => (Array.isArray(row) ? row.map((cell) => (cell == null ? "" : String(cell))) : []))
+    : [];
+  if (headers.length === 0 && rows.length === 0) return null;
+  return { headers, rows };
+}
+
+function tablesFromExtract(body) {
+  const rec = asRecord(body);
+  const data = rec?.data ?? rec?.tables ?? body;
+  const dataRec = asRecord(data);
+  const list = Array.isArray(data)
+    ? data
+    : Array.isArray(dataRec?.tables)
+      ? dataRec.tables
+      : Array.isArray(rec?.tables)
+        ? rec.tables
+        : [];
+  return list.map(normalizeTable).filter(Boolean);
+}
+
+function extractCredits(tables, charged) {
+  return tables.length === 0 ? 0 : (charged ?? 8);
+}
+
+function thinContentMessages(body) {
+  const rec = asRecord(body);
+  const warnings = Array.isArray(rec?.warnings) ? rec.warnings : [];
+  return warnings
+    .map((warning) => {
+      if (warning === "THIN_CONTENT") return "THIN_CONTENT";
+      const row = asRecord(warning);
+      return row?.code === "THIN_CONTENT" ? (row.message || "THIN_CONTENT") : null;
+    })
+    .filter(Boolean);
+}
+
+function assert(name, cond) {
+  if (!cond) throw new Error(`FAIL: ${name}`);
+  console.log(`ok  ${name}`);
+}
+
+const liveBatch = {
+  items: [
+    {
+      url: "https://example.com",
+      ok: true,
+      data: {
+        markdown: "Example Domain",
+        warnings: [{ code: "THIN_CONTENT", message: "Extracted only 16 words" }],
+      },
+      error: null,
+    },
+    {
+      url: "https://example.org",
+      ok: true,
+      data: { markdown: "Example Domain" },
+      error: null,
+    },
+  ],
+  charged: 2,
+};
+
+const urls = ["https://example.com", "https://example.org"];
+
+// Old bug: only reading `results` produced [] and the UI fell back to all-failed.
+const oldResults = Array.isArray(liveBatch.results) ? liveBatch.results : [];
+assert("old mapper missed items", oldResults.length === 0);
+
+const mapped = batchItemsFromBody(liveBatch, urls);
+assert("reads items[]", mapped.length === 2);
+assert("item 0 ok", mapped[0].ok === true);
+assert("item 1 ok", mapped[1].ok === true);
+assert("markdown present", mapped[0].data.markdown.includes("Example Domain"));
+assert("credits from charged / okCount", liveBatch.charged === mapped.filter((i) => i.ok).length);
+assert("thin content surfaced", thinContentMessages(mapped[0].data)[0].includes("16 words"));
+
+const walletBatch = {
+  results: [
+    { url: "https://example.com", ok: true, data: { markdown: "ok" } },
+    { url: "https://example.org", ok: false, error: { status: 422, message: "Upstream responded 404" } },
+  ],
+};
+const walletMapped = batchItemsFromBody(walletBatch, urls);
+assert("wallet results still work", walletMapped[0].ok && !walletMapped[1].ok);
+assert("failed keeps message", walletMapped[1].error.message.includes("404"));
+
+const emptyExtract = { data: { tables: [] } };
+const tables = tablesFromExtract(emptyExtract);
+assert("empty tables is empty", tables.length === 0);
+assert("empty extract not billed as 8", extractCredits(tables, undefined) === 0);
+assert("usable extract still 8", extractCredits([{ headers: ["A"], rows: [["1"]] }], undefined) === 8);
+
+console.log("\nAll workbench mapping checks passed.");

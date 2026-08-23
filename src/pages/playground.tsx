@@ -198,7 +198,7 @@ function creditsFromResponse(res: Response, body: unknown, fallback: number): nu
   if (header && Number.isFinite(Number(header))) return Math.max(0, Number(header));
   const rec = asRecord(body);
   if (rec) {
-    for (const key of ["creditsCharged", "creditsUsed", "charged", "credits"]) {
+    for (const key of ["creditsCharged", "creditsUsed", "charged"]) {
       if (typeof rec[key] === "number" && Number.isFinite(rec[key])) {
         return Math.max(0, rec[key] as number);
       }

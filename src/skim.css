@@ -96,6 +96,18 @@
 .skim-keyless { color: #1d5ad8; font-size: 10px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; }
 .skim-primary .skim-keyless { color: rgba(16,19,26,.55); }
 
+/* Agent feature cards (home) */
+.skim-features { max-width: 980px; margin: 0 auto; padding: 8px 28px 12px; }
+.skim-features-head { text-align: center; margin-bottom: 22px; }
+.skim-features-head h2 { margin: 0; color: #5e6778; font-size: 28px; font-weight: 700; letter-spacing: -.04em; }
+.skim-features-head p { margin: 8px 0 0; color: rgba(16,19,26,.5); font-size: 15px; }
+.skim-features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.skim-feature { display: block; text-decoration: none; color: inherit; background: rgba(255,255,255,.72); border: 1px solid rgba(35,108,255,.16); border-radius: 16px; padding: 20px 18px; transition: border-color .18s, box-shadow .18s; }
+.skim-feature:hover { border-color: rgba(35,108,255,.45); box-shadow: 0 8px 24px rgba(35,108,255,.1); }
+.skim-feature-kicker { display: block; font: 600 10px/1 'JetBrains Mono', monospace; letter-spacing: .06em; color: #236CFF; margin-bottom: 8px; }
+.skim-feature h3 { margin: 0 0 8px; font-size: 17px; font-weight: 700; letter-spacing: -.02em; color: #10131a; }
+.skim-feature p { margin: 0; font-size: 13px; line-height: 1.5; color: rgba(16,19,26,.55); }
+
 /* Instant trial key box (home) */
 .skim-trial { max-width: 780px; margin: 0 auto; padding: 48px 28px 0; }
 .skim-trial-box { border-radius: 17px; background: #fde68a; box-shadow: 0 16px 50px rgba(35,108,255,.14); padding: 34px 30px 30px; text-align: center; }
@@ -134,6 +146,7 @@
   .skim-connect-row { grid-template-columns: 1fr; gap: 28px; }
   .skim-logos, .skim-logos.right { justify-content: center; }
   .skim-connect-copy { grid-row: 1; white-space: normal; }
+  .skim-features-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
   .skim-nav { padding: 0 20px; }

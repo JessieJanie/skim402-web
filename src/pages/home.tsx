@@ -356,6 +356,30 @@ export default function Home() {
           <HeroDemo />
         </section>
 
+        <section className="skim-features" id="agent-features">
+          <div className="skim-features-head">
+            <h2>Three things agents ask for.</h2>
+            <p>Same free API key as a single read. Wallet pay works too.</p>
+          </div>
+          <div className="skim-features-grid">
+            <a href="/docs#batch" className="skim-feature">
+              <span className="skim-feature-kicker">POST /api/t/read/batch</span>
+              <h3>Batch reads</h3>
+              <p>Up to 10 URLs, clean markdown back per URL. 1 credit per successful read. Partial success is fine.</p>
+            </a>
+            <a href="/docs#extract" className="skim-feature">
+              <span className="skim-feature-kicker">POST /api/t/extract</span>
+              <h3>Extract a table</h3>
+              <p>URL + a short intent and a JSON schema. Structured rows come back — from the page, never invented. 8 credits.</p>
+            </a>
+            <a href="/docs#watch" className="skim-feature">
+              <span className="skim-feature-kicker">GET /api/t/read</span>
+              <h3>Watch a page</h3>
+              <p>Compare receipt.contentHash across reads. 1 credit per actual fetch. Hosted wallet watches if you want a watch id.</p>
+            </a>
+          </div>
+        </section>
+
         <section className="skim-connect">
           <div className="skim-connect-row">
             <div className="skim-connect-copy"><h2>Get your agent skimming now.</h2><p>Start with a free API key. Skim reads the web so your agent doesn&apos;t have to parse HTML.</p></div>

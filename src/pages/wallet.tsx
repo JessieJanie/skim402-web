@@ -302,9 +302,9 @@ function SetupPicker() {
 
 export default function WalletPage() {
   useDocumentMeta({
-    title: "Get a wallet for Skim — 60 seconds | Skim™",
+    title: "Wallet pay (optional) — USDC on Base | Skim™",
     description:
-      "How to set up a Base wallet to use Skim. Install a wallet, fund it with USDC on Base, paste the private key into your agent's config. Done in five minutes.",
+      "Optional x402 path: pay Skim per call in USDC on Base. Most people start with a free API key instead — 1,000 credits, no wallet required.",
     canonical: "https://skim402.com/wallet",
   });
 

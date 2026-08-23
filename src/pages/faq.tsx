@@ -126,11 +126,11 @@ const SECTIONS: Section[] = [
         q: "Is Skim free?",
         a: (
           <p>
-            You can{" "}
-            <ExtLink href="https://freeskims.skim402.com">try it free</ExtLink>{" "}
-            right now, and the <PageLink href="/pricing">card Free Plan</PageLink>{" "}
-            includes 1,000 clean reads every month at no charge. Beyond that,
-            reads cost fractions of a cent, so light usage costs pennies.
+            Yes. Create a free API key on the{" "}
+            <PageLink href="/">homepage</PageLink> (1,000 credits, no wallet),
+            or start the <PageLink href="/pricing">monthly Free Plan</PageLink>{" "}
+            — card on file, never charged, 1,000 reads every month. Beyond
+            that, reads cost fractions of a cent.
           </p>
         ),
       },
@@ -160,11 +160,11 @@ const SECTIONS: Section[] = [
         q: "What payment methods do you accept?",
         a: (
           <p>
-            The easiest way is <PageLink href="/pricing">paying by card</PageLink>{" "}
-            — a normal credit card, real invoices, cancel anytime.
-            Alternatively, agents with their own{" "}
-            <PageLink href="/wallet">funded wallet</PageLink> can pay per call
-            directly, with no account at all.
+            Start with a free <InlineCode>sk402_</InlineCode> key, or a{" "}
+            <PageLink href="/pricing">card plan</PageLink> — normal credit
+            card, real invoices, cancel anytime. Agents that already have a{" "}
+            <PageLink href="/wallet">funded wallet</PageLink> can optionally
+            pay per call in USDC instead.
           </p>
         ),
       },

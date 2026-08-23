@@ -54,10 +54,10 @@ const routes = [
     lastmod: "2026-08-23",
     title: "Reader Workbench | Skim",
     description:
-      "Try Skim in the browser: one page, several pages, extract a table, or watch a page for changes. Uses the same free trial key as a single read.",
+      "Try Skim in the browser: one page, several pages, extract a table, crawl a site, read a PDF, or watch a page for changes. Uses the same free trial key as a single read.",
     ogTitle: "Reader Workbench | Skim",
     ogDescription:
-      "Try one page, several pages, extract a table, or watch a page — no curl required.",
+      "Try one page, several pages, extract, crawl, PDF, or watch — no curl required.",
   },
   {
     path: "/pricing",
@@ -107,13 +107,13 @@ const routes = [
   {
     path: "/docs",
     outFile: "docs/index.html",
-    lastmod: "2026-08-17",
-    title: "Docs — reads, Signals, extraction, and more | Skim",
+    lastmod: "2026-08-23",
+    title: "Docs — reads, Signals, crawl, PDF, and more | Skim",
     description:
-      "Complete Skim API docs: reads, JS rendering, batch reads, extraction, tables, datasets, Signals, and Skim Watch. Pay with a card-plan API key or per-call in USDC over x402. Quickstart in curl, JavaScript, and Python.",
+      "Complete Skim API docs: reads, crawl, PDF-to-markdown, watch webhooks, extraction, tables, datasets, Signals, and Skim Watch. Pay with a card-plan API key or per-call in USDC over x402. Quickstart in curl, JavaScript, and Python.",
     ogTitle: "Skim Docs — every endpoint, curl to Python",
     ogDescription:
-      "Reads, extraction, tables, datasets, 18 Signals, and Skim Watch. Pay with a plan key or per-call in USDC.",
+      "Reads, crawl, PDF, watch webhooks, extraction, tables, datasets, 18 Signals. Pay with a plan key or per-call in USDC.",
   },
   {
     path: "/signals",

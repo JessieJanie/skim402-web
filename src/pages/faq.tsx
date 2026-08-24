@@ -50,11 +50,11 @@ const SECTIONS: Section[] = [
         q: "What is Skim?",
         a: (
           <p>
-            Skim is a reader API for AI agents. Your agent sends a URL and gets
-            back clean, agent-ready markdown plus structured metadata —
-            typically in about a second. Start with a free{" "}
-            <InlineCode>sk402_</InlineCode> API key (1,000 credits, no wallet).
-            Monthly plans are optional; so is paying per call in USDC.
+            Skim is a clean URL-to-markdown reader for agents. Your agent sends
+            a URL and gets back clean, agent-ready markdown plus structured
+            metadata — typically in about a second. The card API key{" "}
+            <InlineCode>sk402_</InlineCode> is the default path (1,000 credits,
+            no wallet). USDC on Base via x402 is optional.
           </p>
         ),
       },

@@ -304,7 +304,7 @@ export default function WalletPage() {
   useDocumentMeta({
     title: "Wallet pay (optional) — USDC on Base | Skim™",
     description:
-      "Optional x402 path: pay Skim per call in USDC on Base. Most people start with a free API key instead — 1,000 credits, no wallet required.",
+      "Optional x402 path: pay per call in USDC on Base. The card API key (sk402_) is the default path — 1,000 credits, no wallet required.",
     canonical: "https://skim402.com/wallet",
   });
 

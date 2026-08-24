@@ -41,12 +41,12 @@ const routes = [
     path: "/",
     outFile: "index.html",
     lastmod: "2026-08-17",
-    title: "Skim — Web reads and Signals for AI agents",
+    title: "Skim — a clean URL-to-markdown reader for agents",
     description:
-      "Clean web reads and structured intelligence feeds for AI agents. Free plan included — 1,000 credits a month, no credit card required. Seventeen vertical Signals plus the x402 ecosystem feed. Pay by card on a monthly plan, or per-call in USDC by crypto wallet.",
-    ogTitle: "Skim — Web reads and Signals for AI agents",
+      "Skim is a clean URL-to-markdown reader for agents. Card API key (sk402_) is the default path; USDC on Base via x402 is optional.",
+    ogTitle: "Skim — a clean URL-to-markdown reader for agents",
     ogDescription:
-      "Clean web reads and structured intelligence feeds for AI agents. Free plan included — 1,000 credits a month. Pay by card or by crypto wallet.",
+      "Skim is a clean URL-to-markdown reader for agents. Card API key (sk402_) is the default path; USDC on Base via x402 is optional.",
   },
   {
     path: "/playground",

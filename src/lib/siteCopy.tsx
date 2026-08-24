@@ -48,7 +48,7 @@ export const COPY_SLOTS: Record<string, CopySlot> = {
   },
   "home.descriptor": {
     label: "Home — supporting paragraph (what Skim is + prices)",
-    text: "Skim turns any URL into agent-ready markdown for $0.002 per read, or typed JSON for $0.015. Start with a free API key. Pay by card on a monthly plan, or optionally per-call in USDC by crypto wallet. Don't pay LLM rates for non-LLM work.",
+    text: "Skim is a clean URL-to-markdown reader for agents. $0.002 per read, or typed JSON for $0.015. The card API key (sk402_) is the default path. USDC on Base via x402 is optional. Don't pay LLM rates for non-LLM work.",
   },
   "home.freeNote": {
     label: "Home — note under the buttons",

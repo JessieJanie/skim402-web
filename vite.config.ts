@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { tokenProductsVitePlugin } from "./server/tokenProducts.mjs";
+import { x402DiscoveryVitePlugin } from "./server/x402Discovery.mjs";
 
 const rawPort = process.env.PORT;
 const port = rawPort ? Number(rawPort) : 5173;
@@ -17,6 +18,7 @@ const basePath = process.env.BASE_PATH ?? "/";
 export default defineConfig({
   base: basePath,
   plugins: [
+    x402DiscoveryVitePlugin(),
     tokenProductsVitePlugin(),
     react(),
     tailwindcss({ optimize: false }),

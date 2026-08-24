@@ -50,6 +50,28 @@ export function normalizeStartUrl(raw) {
   }
 }
 
+/** Collapse trailing-slash twins so example.com and example.com/ bill once. */
+export function canonicalizePageUrl(raw) {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  try {
+    const parsed = new URL(raw.trim());
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    parsed.hash = "";
+    parsed.hostname = parsed.hostname.toLowerCase();
+    let path = parsed.pathname || "/";
+    if (path.length > 1) {
+      path = path.replace(/\/+$/, "") || "/";
+      if (!path.startsWith("/")) path = `/${path}`;
+    } else {
+      path = "/";
+    }
+    parsed.pathname = path;
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
 export function pageScore(url) {
   let path;
   try {
@@ -95,10 +117,11 @@ export function linksFromHtml(html, baseUrl) {
     }
     try {
       const abs = new URL(href, baseUrl);
-      abs.hash = "";
+      const canon = canonicalizePageUrl(abs.href);
+      if (!canon) continue;
       if (abs.protocol !== "http:" && abs.protocol !== "https:") continue;
-      if (!sameOrigin(abs.href, baseUrl)) continue;
-      found.add(abs.href);
+      if (!sameOrigin(canon, baseUrl)) continue;
+      found.add(canon);
     } catch {
       // skip
     }
@@ -124,20 +147,30 @@ export function pickPages(candidates, origin, maxPages) {
   const seen = new Set();
   const ranked = [];
   for (const raw of candidates) {
-    if (!raw || seen.has(raw)) continue;
-    if (!sameOrigin(raw, origin)) continue;
-    if (isBlockedUrl(raw)) continue;
-    if (pageScore(raw) < 0) continue;
-    seen.add(raw);
-    ranked.push(raw);
+    const url = canonicalizePageUrl(raw);
+    if (!url || seen.has(url)) continue;
+    if (!sameOrigin(url, origin)) continue;
+    if (isBlockedUrl(url)) continue;
+    if (pageScore(url) < 0) continue;
+    seen.add(url);
+    ranked.push(url);
   }
   ranked.sort((a, b) => pageScore(b) - pageScore(a) || a.length - b.length);
   return ranked.slice(0, maxPages);
 }
 
+function pushCandidate(candidates, raw) {
+  const url = canonicalizePageUrl(raw);
+  if (!url || candidates.length >= DISCOVERY_CAP) return;
+  candidates.push(url);
+}
+
 async function discover(fetchImpl, start, origin) {
   const sources = [];
-  const candidates = [start, origin, `${origin}/`];
+  const candidates = [];
+  pushCandidate(candidates, start);
+  pushCandidate(candidates, origin);
+  pushCandidate(candidates, `${origin}/`);
   const sitemapSeeds = [`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`];
 
   const robots = await safeFetch(fetchImpl, `${origin}/robots.txt`, {
@@ -169,7 +202,7 @@ async function discover(fetchImpl, start, origin) {
     if (locs.length) sources.push("sitemap");
     for (const loc of locs) {
       if (candidates.length >= DISCOVERY_CAP) break;
-      candidates.push(loc);
+      pushCandidate(candidates, loc);
     }
   }
 
@@ -185,7 +218,7 @@ async function discover(fetchImpl, start, origin) {
     if (links.length) sources.push("links");
     for (const link of links) {
       if (candidates.length >= DISCOVERY_CAP) break;
-      candidates.push(link);
+      pushCandidate(candidates, link);
     }
   }
 
@@ -233,7 +266,7 @@ export function createCrawlHandler(opts = {}) {
     const { candidates, sources } = await discover(fetchImpl, start.url, start.origin);
     const pages = pickPages(candidates, start.origin, maxPages);
     if (pages.length === 0) {
-      pages.push(start.url);
+      pages.push(canonicalizePageUrl(start.url) || start.url);
     }
 
     const results = await mapPool(pages, CRAWL_CONCURRENCY, async (pageUrl) => {

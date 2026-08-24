@@ -29,6 +29,7 @@ import Audit from "@/pages/audit";
 import CardPage from "@/pages/card";
 import CardSuccess from "@/pages/card-success";
 import CardAccount from "@/pages/card-account";
+import AccountRedirect from "@/pages/account";
 import Playground from "@/pages/playground";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -78,6 +79,8 @@ function ServerApp({ path }: { path: string }) {
               <Route path="/card" component={CardPage} />
               <Route path="/card/success" component={CardSuccess} />
               <Route path="/card/account" component={CardAccount} />
+              <Route path="/account" component={AccountRedirect} />
+              <Route path="/account/" component={AccountRedirect} />
             </Switch>
           </TooltipProvider>
         </QueryClientProvider>

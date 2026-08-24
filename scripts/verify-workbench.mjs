@@ -111,6 +111,37 @@ function thinContentMessages(body) {
     .filter(Boolean);
 }
 
+function creditsFromAccount(account) {
+  if (!account || typeof account !== "object" || Array.isArray(account)) return null;
+  for (const key of ["creditsRemaining", "remainingCredits"]) {
+    if (typeof account[key] === "number" && Number.isFinite(account[key])) return Math.max(0, account[key]);
+  }
+  if (typeof account.packCredits === "number" || typeof account.planCredits === "number") {
+    return Math.max(0, (Number(account.packCredits) || 0) + (Number(account.planCredits) || 0));
+  }
+  if (typeof account.credits === "number" && Number.isFinite(account.credits)) return Math.max(0, account.credits);
+  return null;
+}
+
+function apiErrorMessage(status, body, fallback) {
+  const rec = asRecord(body);
+  const code = typeof rec?.error === "string" ? rec.error : "";
+  const message = typeof rec?.message === "string" ? rec.message : "";
+  if (status === 401) return "Invalid or expired API key.";
+  if (code === "empty_pdf") return message || "No extractable text found in this PDF (possibly image-only or encrypted).";
+  return message || (code && !/^[a-z0-9_]+$/i.test(code) ? code : "") || fallback;
+}
+
+function isEmptyPdfMiss(status, body) {
+  const rec = asRecord(body);
+  if (!rec) return false;
+  if (status !== 422 && status !== 200) return false;
+  const code = typeof rec.error === "string" ? rec.error : "";
+  const message = typeof rec.message === "string" ? rec.message : "";
+  if (code === "empty_pdf") return true;
+  return /no extractable text/i.test(message);
+}
+
 function assert(name, cond) {
   if (!cond) throw new Error(`FAIL: ${name}`);
   console.log(`ok  ${name}`);
@@ -169,5 +200,11 @@ assert("usable extract still 8", extractCredits([{ headers: ["A"], rows: [["1"]]
 assert("422 empty is a miss", isEmptyExtractMiss(422, { error: "unprocessable", message: "No usable rows extracted from this page", data: { tables: [] }, charged: 0 }));
 assert("422 hostname is not a miss", !isEmptyExtractMiss(422, { error: "Could not resolve URL hostname" }));
 assert("200 empty tables is a miss", isEmptyExtractMiss(200, emptyExtract));
+
+assert("account pack+plan is ledger remaining", creditsFromAccount({ packCredits: 966, planCredits: 0 }) === 966);
+assert("trial-key credits fallback", creditsFromAccount({ credits: 1000 }) === 1000);
+assert("empty_pdf uses message not code", apiErrorMessage(422, { error: "empty_pdf", message: "No extractable text found in this PDF (possibly image-only or encrypted)" }, "fallback").includes("extractable text"));
+assert("empty_pdf is a miss", isEmptyPdfMiss(422, { error: "empty_pdf", message: "No extractable text found in this PDF" }));
+assert("other 422 pdf fetch is not empty_pdf miss", !isEmptyPdfMiss(422, { error: "unprocessable", message: "Upstream responded 404" }));
 
 console.log("\nAll workbench mapping checks passed.");

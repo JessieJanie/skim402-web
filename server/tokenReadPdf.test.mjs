@@ -33,6 +33,23 @@ trailer
   return Buffer.from(objects, "latin1");
 }
 
+function emptyPdf() {
+  return Buffer.from(`%PDF-1.1
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>
+endobj
+trailer
+<< /Root 1 0 R >>
+%%EOF
+`, "latin1");
+}
+
 test("extracts literal Tj strings and outline titles", () => {
   assert.deepEqual(extractStringsFromContent("BT (Hello) Tj ET"), ["Hello"]);
   const parsed = pdfToMarkdown(minimalPdf("Clean markdown from PDF"));
@@ -151,4 +168,29 @@ test("read-pdf blocks private URLs", async () => {
     body: { url: "http://127.0.0.1/secret.pdf" },
   });
   assert.equal(result.status, 403);
+});
+
+test("empty PDFs return empty_pdf, charged 0, and skip debit", async () => {
+  let debited = 0;
+  const handle = createReadPdfHandler({
+    fetchImpl: mockFetch({
+      "GET /api/card/account": { body: { packCredits: 20, planCredits: 0 } },
+      "GET /dummy.pdf": { buffer: emptyPdf() },
+    }),
+    debitCredits: async () => {
+      debited += 1;
+      return { status: 200, charged: 3 };
+    },
+  });
+  const result = await handle({
+    method: "POST",
+    url: "/api/t/read-pdf",
+    headers: AUTH,
+    body: { url: "https://example.com/dummy.pdf" },
+  });
+  assert.equal(result.status, 422);
+  assert.equal(result.body.error, "empty_pdf");
+  assert.match(result.body.message, /extractable text/i);
+  assert.equal(result.body.charged, 0);
+  assert.equal(debited, 0);
 });

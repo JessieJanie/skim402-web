@@ -117,6 +117,17 @@ const routes = [
       "Check your Skim balance and manage billing — your API key is your account.",
   },
   {
+    path: "/account",
+    outFile: "account/index.html",
+    noSitemap: true,
+    title: "Your account | Skim",
+    description:
+      "Check your Skim balance: credits remaining, plan status, and pending overage. Manage billing or cancel anytime.",
+    ogTitle: "Your account | Skim",
+    ogDescription:
+      "Check your Skim balance and manage billing — your API key is your account.",
+  },
+  {
     path: "/docs",
     outFile: "docs/index.html",
     lastmod: "2026-08-23",

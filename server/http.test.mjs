@@ -46,6 +46,8 @@ test("HMAC signatures verify with timing-safe compare", () => {
 test("remainingCredits reads common account shapes", () => {
   assert.equal(remainingCredits({ creditsRemaining: 12 }), 12);
   assert.equal(remainingCredits({ monthlyCredits: 10, packCredits: 2 }), 12);
+  assert.equal(remainingCredits({ planCredits: 10, packCredits: 2 }), 12);
+  assert.equal(remainingCredits({ packCredits: 1000, planCredits: 0 }), 1000);
   assert.equal(remainingCredits({}), null);
 });
 

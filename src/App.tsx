@@ -21,6 +21,7 @@ import WalletPage from "@/pages/wallet";
 import CardPage from "@/pages/card";
 import CardSuccess from "@/pages/card-success";
 import CardAccount from "@/pages/card-account";
+import AccountRedirect from "@/pages/account";
 import ArticlesIndex from "@/pages/articles";
 import SanerWayForward from "@/pages/articles/saner-way-forward";
 import YourAgentIsNotAUser from "@/pages/articles/your-agent-is-not-a-user";
@@ -201,6 +202,8 @@ function ClerkProviderWithRoutes() {
             <Route path="/card" component={CardPage} />
             <Route path="/card/success" component={CardSuccess} />
             <Route path="/card/account" component={CardAccount} />
+            <Route path="/account" component={AccountRedirect} />
+            <Route path="/account/" component={AccountRedirect} />
             <Route path="/docs" component={Docs} />
             <Route path="/signals" component={Signals} />
             <Route path="/contact" component={Contact} />

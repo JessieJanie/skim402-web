@@ -390,15 +390,11 @@ export default function Docs() {
             </P>
             <P>
               Want to see the output first?{" "}
-              <a
-                className="text-primary hover:underline font-medium"
-                href="https://freeskims.skim402.com"
-                target="_blank"
-                rel="noreferrer"
-              >
+              <Link href="/playground/" className="text-primary hover:underline font-medium">
                 Try Skim free in your browser
-              </a>{" "}
-              — 10 free skims a day, no wallet, no signup.
+              </Link>
+              {" "}
+              — no wallet, no signup.
             </P>
 
             <H2 id="fund">Fund your wallet (x402 path)</H2>
@@ -1629,6 +1625,9 @@ curl https://skim402.com/api/v2/dataset/ds_LviVNQtobY0pSEfxpRqB7K0O`}
               successful page is billed through the existing{" "}
               <InlineCode>/t/read</InlineCode> ledger — 1 credit per page
               that actually returns markdown. Failed pages are not charged.
+              Trailing-slash twins (<InlineCode>example.com</InlineCode> and{" "}
+              <InlineCode>example.com/</InlineCode>) are the same page and
+              are billed once.
             </P>
             <H3>Request body</H3>
             <div className="rounded-xl border border-border bg-card px-6">
@@ -1876,7 +1875,11 @@ function valid(secret, rawBody, header) {
             </P>
             <P>
               Credits: <strong>3</strong> (JS-read rate), not extract (8).
-              Failed conversions are not charged.
+              Failed conversions are not charged. Image-only or encrypted
+              PDFs return <InlineCode>422</InlineCode> with{" "}
+              <InlineCode>error: "empty_pdf"</InlineCode>, a human{" "}
+              <InlineCode>message</InlineCode>, and{" "}
+              <InlineCode>charged: 0</InlineCode>.
             </P>
             <H3>Request body</H3>
             <div className="rounded-xl border border-border bg-card px-6">

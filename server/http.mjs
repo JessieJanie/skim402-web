@@ -116,7 +116,7 @@ export function remainingCredits(account) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
   }
   const packs = account.packCredits ?? account.packsRemaining;
-  const monthly = account.monthlyCredits ?? account.monthlyRemaining;
+  const monthly = account.planCredits ?? account.monthlyCredits ?? account.monthlyRemaining;
   if (typeof packs === "number" || typeof monthly === "number") {
     return (Number(packs) || 0) + (Number(monthly) || 0);
   }

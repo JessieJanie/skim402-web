@@ -24,7 +24,10 @@ const sections: Section[] = [
   { id: "presets", label: "Extraction presets" },
   { id: "tables", label: "POST /v1/tables" },
   { id: "dataset", label: "POST /v2/dataset" },
+  { id: "crawl", label: "POST /t/crawl" },
   { id: "watch", label: "Custom URL watches" },
+  { id: "watch-webhooks", label: "Watch webhooks" },
+  { id: "read-pdf", label: "POST /t/read-pdf" },
   { id: "feed", label: "GET /v2/feeds/x402/latest" },
   { id: "signals", label: "Skim Signal series" },
   { id: "card", label: "Pay by card (token auth)" },
@@ -272,9 +275,9 @@ const SIGNAL_ROWS: SignalRow[] = [
 
 export default function Docs() {
   useDocumentMeta({
-    title: "Docs — reads, Signals, extraction, and more | Skim",
+    title: "Docs — reads, Signals, crawl, PDF, and more | Skim",
     description:
-      "Complete Skim API docs: reads, JS rendering, batch reads, extraction, tables, datasets, Signals, and Skim Watch. Pay with a card-plan API key or per-call in USDC over x402.",
+      "Complete Skim API docs: reads, crawl, PDF-to-markdown, watch webhooks, extraction, tables, datasets, and Signals. Pay with a card-plan API key or per-call in USDC over x402.",
     canonical: "https://skim402.com/docs",
   });
 
@@ -350,7 +353,7 @@ export default function Docs() {
             </div>
 
             <P>
-              The token-gated endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/js</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/batch</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/extract</code>) require an API key and use credit billing. The x402 endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read/js</code>, etc.) require no key — each call is paid in USDC at the moment it succeeds.
+              The token-gated endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/js</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read/batch</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/extract</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/crawl</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/watch</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/t/read-pdf</code>) require an API key and use credit billing. The x402 endpoints (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read</code>, <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">/api/v1/read/js</code>, etc.) require no key — each call is paid in USDC at the moment it succeeds.
             </P>
 
             {/* ── Quickstart ─────────────────────────────────────────── */}
@@ -1572,6 +1575,74 @@ curl https://skim402.com/api/v2/dataset/ds_LviVNQtobY0pSEfxpRqB7K0O`}
               rejected before payment settles.
             </P>
 
+            <H2 id="crawl">POST /t/crawl</H2>
+            <P>
+              Give Skim a site — an origin or a start URL — and get the
+              important pages back as clean markdown. Discovery uses{" "}
+              <InlineCode>sitemap.xml</InlineCode> (and{" "}
+              <InlineCode>robots.txt</InlineCode> sitemap lines) plus
+              same-origin links on the start page. Private, loopback, and
+              link-local hosts are rejected with the same SSRF rules as{" "}
+              <InlineCode>/t/read</InlineCode>. Capped at 25 pages. Each
+              successful page is billed through the existing{" "}
+              <InlineCode>/t/read</InlineCode> ledger — 1 credit per page
+              that actually returns markdown. Failed pages are not charged.
+            </P>
+            <H3>Request body</H3>
+            <div className="rounded-xl border border-border bg-card px-6">
+              <Field name="url" type="string" required>
+                Site origin or start URL.{" "}
+                <InlineCode>example.com</InlineCode> is treated as{" "}
+                <InlineCode>https://example.com</InlineCode>.
+              </Field>
+              <Field name="maxPages" type="integer">
+                Optional cap, 1–25. Default 25.
+              </Field>
+              <Field name="stripLinks" type="boolean">
+                Passed through to each page read.
+              </Field>
+              <Field name="stripImages" type="boolean">
+                Passed through to each page read.
+              </Field>
+            </div>
+            <H3>Example</H3>
+            <Code>
+{`curl -X POST https://skim402.com/api/t/crawl \\
+  -H "Authorization: Bearer sk402_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "url": "https://example.com", "maxPages": 10 }'`}
+            </Code>
+            <H3>Response</H3>
+            <Code>
+{`{
+  "url": "https://example.com",
+  "origin": "https://example.com",
+  "pageCount": 8,
+  "discovered": 24,
+  "capped": true,
+  "maxPages": 10,
+  "sources": ["sitemap", "links"],
+  "charged": 8,
+  "pages": [
+    {
+      "url": "https://example.com/docs",
+      "ok": true,
+      "title": "Docs",
+      "markdown": "# Docs\\n\\n..."
+    }
+  ],
+  "fetchedAt": "2026-08-23T22:00:00Z"
+}`}
+            </Code>
+            <P>
+              Try it in the{" "}
+              <Link href="/playground?mode=crawl" className="text-primary hover:underline">
+                Workbench — Crawl a site
+              </Link>
+              . Same key auth as every other{" "}
+              <InlineCode>/t/</InlineCode> route.
+            </P>
+
             <H2 id="watch">Custom URL watches</H2>
             <P>
               Watch the pages <em>you</em> care about. Register a list of 1
@@ -1670,6 +1741,138 @@ curl https://skim402.com/api/v2/dataset/ds_LviVNQtobY0pSEfxpRqB7K0O`}
               <InlineCode>GET /v2/watch/status?id=</InlineCode> is free: the
               registered URLs, note, poll count, and last-poll time — no
               diff, no payment header needed.
+            </P>
+
+            <H2 id="watch-webhooks">Watch webhooks</H2>
+            <P>
+              Watch is still poll-driven — there is no background cron. Pass
+              an HTTPS <InlineCode>webhookUrl</InlineCode> when you create or
+              update a watch. The first time <InlineCode>GET /t/watch/diff</InlineCode>{" "}
+              sees a page <InlineCode>status: "changed"</InlineCode>, Skim
+              POSTs a signed JSON payload to that URL. Unchanged pages,
+              first-check baselines, errors, and cached polls (
+              <InlineCode>fresh: true</InlineCode>) do not fire. Same change
+              (same content hash) is not delivered twice.
+            </P>
+            <P>
+              No email. You get a <InlineCode>webhookSecret</InlineCode> once
+              — store it and verify <InlineCode>X-Skim-Signature</InlineCode>.
+            </P>
+            <H3>Register with a webhook</H3>
+            <Code>
+{`curl -X POST https://skim402.com/api/t/watch \\
+  -H "Authorization: Bearer sk402_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "urls": ["https://competitor.com/pricing"],
+    "webhookUrl": "https://example.com/hooks/skim"
+  }'
+
+# -> 201 includes watchId and webhookSecret (shown once)`}
+            </Code>
+            <H3>Update an existing watch</H3>
+            <Code>
+{`curl -X PATCH https://skim402.com/api/t/watch \\
+  -H "Authorization: Bearer sk402_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "watchId": "w_kF3nW8pQx2LmT9rYb6JcHd0V",
+    "webhookUrl": "https://example.com/hooks/skim"
+  }'`}
+            </Code>
+            <H3>Payload posted to your URL</H3>
+            <Code>
+{`POST https://example.com/hooks/skim
+Content-Type: application/json
+X-Skim-Signature: sha256=<hex>
+X-Skim-Delivery: whd_…
+
+{
+  "event": "watch.changed",
+  "watchId": "w_kF3nW8pQx2LmT9rYb6JcHd0V",
+  "url": "https://competitor.com/pricing",
+  "status": "changed",
+  "polledAt": "2026-08-23T22:00:00Z",
+  "deliveryId": "whd_…",
+  "diff": {
+    "addedCount": 1,
+    "removedCount": 1,
+    "changeRatio": 0.021,
+    "addedSample": ["Pro plan — $49/month"],
+    "removedSample": ["Pro plan — $39/month"],
+    "numericOnly": true,
+    "titleChanged": false
+  }
+}`}
+            </Code>
+            <H3>Verify the signature</H3>
+            <Code>
+{`import crypto from "node:crypto";
+
+function valid(secret, rawBody, header) {
+  const hex = header.replace(/^sha256=/, "");
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  return crypto.timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(hex, "hex"));
+}`}
+            </Code>
+            <P>
+              Webhook URLs must be public <InlineCode>https://</InlineCode> —
+              the same SSRF rules as reads (no localhost, no private ranges).
+              Delivery failures do not fail the diff response. Poll{" "}
+              <InlineCode>GET /t/watch/diff?id=</InlineCode> on your schedule;
+              that is when changes are detected and the webhook fires.
+            </P>
+
+            <H2 id="read-pdf">POST /t/read-pdf</H2>
+            <P>
+              Fetch a public PDF URL and return clean markdown plus an
+              optional outline. Text comes only from the file — nothing is
+              invented. Image-only scans are rejected (no OCR). Files larger
+              than 8 MB return <InlineCode>413</InlineCode> with a clear
+              error. Same key auth as other <InlineCode>/t/</InlineCode>{" "}
+              routes.
+            </P>
+            <P>
+              Credits: <strong>3</strong> (JS-read rate), not extract (8).
+              Failed conversions are not charged.
+            </P>
+            <H3>Request body</H3>
+            <div className="rounded-xl border border-border bg-card px-6">
+              <Field name="url" type="string" required>
+                Absolute <InlineCode>http(s)://</InlineCode> PDF URL. Same
+                SSRF rules as <InlineCode>/t/read</InlineCode>.
+              </Field>
+              <Field name="outline" type="boolean">
+                Optional, default <InlineCode>true</InlineCode>. Include the
+                PDF bookmark outline when present.
+              </Field>
+            </div>
+            <H3>Example</H3>
+            <Code>
+{`curl -X POST https://skim402.com/api/t/read-pdf \\
+  -H "Authorization: Bearer sk402_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "url": "https://example.com/paper.pdf" }'`}
+            </Code>
+            <H3>Response</H3>
+            <Code>
+{`{
+  "url": "https://example.com/paper.pdf",
+  "finalUrl": "https://example.com/paper.pdf",
+  "markdown": "# Intro\\n\\nHello from the PDF",
+  "text": "Hello from the PDF",
+  "outline": [{ "title": "Intro", "level": 1, "index": 0 }],
+  "pageCount": 1,
+  "charged": 3,
+  "fetchedAt": "2026-08-23T22:00:00Z"
+}`}
+            </Code>
+            <P>
+              Try it in the{" "}
+              <Link href="/playground?mode=pdf" className="text-primary hover:underline">
+                Workbench — PDF
+              </Link>
+              .
             </P>
 
             <H2 id="feed">GET /v2/feeds/x402/latest</H2>
@@ -1933,7 +2136,7 @@ const feed = await res.json();`}
               <Link href="/pricing" className="text-primary hover:underline">
                 card plan
               </Link>
-              . Try read, batch, extract, and watch in the{" "}
+              . Try read, batch, extract, crawl, PDF, and watch in the{" "}
               <Link href="/playground" className="text-primary hover:underline">
                 Workbench
               </Link>{" "}
@@ -1975,6 +2178,40 @@ const feed = await res.json();`}
                 . Failed extracts are refunded. An empty{" "}
                 <InlineCode>{`{ tables: [] }`}</InlineCode> is not a successful
                 extract — do not treat it as an 8-credit success.
+              </Field>
+              <Field name="POST /t/crawl" type="1 credit per page">
+                Body{" "}
+                <InlineCode>{`{ "url", "maxPages"?: 1-25 }`}</InlineCode>.
+                Discovers sitemap + same-origin links, returns markdown per
+                page. Failed pages are not charged.{" "}
+                <a href="#crawl" className="text-primary hover:underline">
+                  Docs
+                </a>
+                .
+              </Field>
+              <Field name="POST /t/watch" type="1 credit to register">
+                Body{" "}
+                <InlineCode>{`{ "urls": [1-20], "webhookUrl"?: "https://…" }`}</InlineCode>
+                . Optional HTTPS webhook; signed POST on{" "}
+                <InlineCode>GET /t/watch/diff</InlineCode> when a page
+                changes.{" "}
+                <a href="#watch-webhooks" className="text-primary hover:underline">
+                  Webhooks
+                </a>
+                .
+              </Field>
+              <Field name="GET /t/watch/diff?id=" type="1 credit per URL">
+                Re-reads the watch list and fires webhooks for{" "}
+                <InlineCode>changed</InlineCode> pages. Cached polls within
+                60s do not re-fire.
+              </Field>
+              <Field name="POST /t/read-pdf" type="3 credits">
+                Body <InlineCode>{`{ "url", "outline"?: bool }`}</InlineCode>.
+                PDF URL → markdown. Rejects files over 8 MB.{" "}
+                <a href="#read-pdf" className="text-primary hover:underline">
+                  Docs
+                </a>
+                .
               </Field>
               <H3>Signal polling</H3>
               <P>

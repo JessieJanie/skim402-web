@@ -110,9 +110,13 @@ const SECTIONS: Section[] = [
         q: "Can Skim crawl a whole site?",
         a: (
           <p>
-            No — one URL in, one clean read out. That keeps it fast and keeps
-            pricing simple. If you need many pages, your agent loops over the
-            URLs it cares about and pays per read.
+            Yes — <InlineCode>POST /api/t/crawl</InlineCode> takes a site
+            origin or start URL, walks <InlineCode>sitemap.xml</InlineCode>{" "}
+            and same-origin links, and returns up to 25 important pages as
+            clean markdown. Each successful page costs 1 credit on the same{" "}
+            <InlineCode>/t/read</InlineCode> ledger. Need a single page? Use{" "}
+            <InlineCode>/t/read</InlineCode>. Try it in the{" "}
+            <PageLink href="/playground?mode=crawl">Workbench</PageLink>.
           </p>
         ),
       },

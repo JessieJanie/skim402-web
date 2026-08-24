@@ -150,6 +150,12 @@ function HomeRedirect() {
   );
 }
 
+function WorkbenchRedirect() {
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
+  return <Redirect to={`/playground${search}${hash}`} />;
+}
+
 const queryClient = new QueryClient();
 
 function ClerkQueryClientCacheInvalidator() {
@@ -206,6 +212,7 @@ function ClerkProviderWithRoutes() {
             <Route path="/aup" component={AUP} />
             <Route path="/wallet" component={WalletPage} />
             <Route path="/playground" component={Playground} />
+            <Route path="/workbench" component={WorkbenchRedirect} />
             <Route path="/articles" component={ArticlesIndex} />
             <Route path="/articles/saner-way-forward" component={SanerWayForward} />
             <Route path="/articles/your-agent-is-not-a-user" component={YourAgentIsNotAUser} />

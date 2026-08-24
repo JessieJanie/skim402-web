@@ -28,7 +28,7 @@ const MODES: { id: WorkbenchMode; label: string; hint: string; cost: string }[] 
     id: "extract",
     label: "Extract a table",
     hint: "Pull structured rows from a page.",
-    cost: "8 credits when the extract succeeds.",
+    cost: "8 credits when usable rows come back. Empty extracts are not billed as a success.",
   },
   {
     id: "watch",
@@ -122,6 +122,7 @@ type ExtractResult = {
   data: unknown;
   jsonRaw: unknown;
   credits: number;
+  empty: boolean;
   ms: number;
 };
 
@@ -190,7 +191,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function creditsFromResponse(res: Response, body: unknown, fallback: number): number {
+function explicitCreditsFromResponse(res: Response, body: unknown): number | null {
   const header =
     res.headers.get("X-Skim-Credits") ??
     res.headers.get("X-Skim-Credits-Charged") ??
@@ -204,7 +205,94 @@ function creditsFromResponse(res: Response, body: unknown, fallback: number): nu
       }
     }
   }
-  return fallback;
+  return null;
+}
+
+function creditsFromResponse(res: Response, body: unknown, fallback: number): number {
+  return explicitCreditsFromResponse(res, body) ?? fallback;
+}
+
+function flagOk(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (value === "true" || value === 1) return true;
+  if (value === "false" || value === 0) return false;
+  return null;
+}
+
+function normalizeBatchItem(value: unknown, fallbackUrl: string): BatchItem {
+  if (typeof value === "string") {
+    return { url: value, ok: false, error: "This URL could not be read." };
+  }
+  const rec = asRecord(value);
+  if (!rec) {
+    return { url: fallbackUrl, ok: false, error: "This URL could not be read." };
+  }
+
+  const dataRec = asRecord(rec.data);
+  const markdown =
+    (typeof dataRec?.markdown === "string" && dataRec.markdown) ||
+    (typeof rec.markdown === "string" && rec.markdown) ||
+    "";
+  const data = (dataRec ?? (markdown ? { markdown } : null)) as ReaderResponse | null;
+  const explicitOk = flagOk(rec.ok) ?? flagOk(rec.success);
+  const hasError = rec.error != null && rec.error !== "";
+  const ok = explicitOk ?? (Boolean(markdown) && !hasError);
+  const url = typeof rec.url === "string" && rec.url ? rec.url : fallbackUrl;
+
+  return {
+    url,
+    ok,
+    data: data ?? undefined,
+    error: ok
+      ? null
+      : typeof rec.error === "string" || (rec.error && typeof rec.error === "object")
+        ? (rec.error as BatchItem["error"])
+        : "This URL could not be read.",
+  };
+}
+
+/** Card-lane batch is `{ items, charged }`. Wallet-lane batch is `{ results }`. */
+function batchItemsFromBody(body: unknown, urls: string[]): BatchItem[] {
+  const rec = asRecord(body);
+  const raw = Array.isArray(rec?.items)
+    ? rec.items
+    : Array.isArray(rec?.results)
+      ? rec.results
+      : Array.isArray(rec?.pages)
+        ? rec.pages
+        : Array.isArray(body)
+          ? body
+          : [];
+  if (raw.length === 0) {
+    return urls.map((url) => ({
+      url,
+      ok: false,
+      error: "No per-URL results in this response.",
+    }));
+  }
+  return raw.map((item, index) => normalizeBatchItem(item, urls[index] ?? ""));
+}
+
+function thinContentMessages(body: unknown): string[] {
+  const rec = asRecord(body);
+  const warnings = Array.isArray(rec?.warnings) ? rec.warnings : [];
+  const messages: string[] = [];
+  for (const warning of warnings) {
+    if (warning === "THIN_CONTENT") {
+      messages.push("This page returned very little text (THIN_CONTENT). Treat it as low confidence.");
+      continue;
+    }
+    const row = asRecord(warning);
+    if (!row) continue;
+    const code = typeof row.code === "string" ? row.code : "";
+    if (code !== "THIN_CONTENT") continue;
+    messages.push(
+      typeof row.message === "string" && row.message
+        ? row.message
+        : "This page returned very little text (THIN_CONTENT). Treat it as low confidence.",
+    );
+  }
+  return messages;
 }
 
 function apiErrorMessage(status: number, body: unknown, fallback: string): string {
@@ -352,16 +440,24 @@ function ModeSwitcher({
           );
         })}
       </div>
+      <p className="text-[13px] text-muted-foreground mt-3">
+        Modes stay available before you paste a URL.
+      </p>
     </div>
   );
 }
 
-function ExtractedTables({ tables, fallback }: { tables: ExtractedTable[]; fallback: unknown }) {
+function ExtractedTables({ tables, empty }: { tables: ExtractedTable[]; empty?: boolean }) {
   if (tables.length === 0) {
     return (
-      <pre className="text-[13px] leading-relaxed font-mono whitespace-pre-wrap text-foreground/80">
-        {JSON.stringify(fallback, null, 2)}
-      </pre>
+      <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-2" data-testid="status-extract-empty">
+        <p className="text-sm font-semibold text-foreground">No table found</p>
+        <p className="text-[13px] leading-relaxed text-muted-foreground">
+          {empty
+            ? "This extract returned no usable rows, so it is not billed as a success. Raw JSON is in the next tab."
+            : "This extract returned no usable rows. Raw JSON is in the next tab."}
+        </p>
+      </div>
     );
   }
   return (
@@ -699,10 +795,9 @@ export default function Playground() {
         clearKeyOn401(res.status);
         return;
       }
-      const rec = asRecord(body);
-      const results = (Array.isArray(rec?.results) ? rec.results : []) as BatchItem[];
+      const results = batchItemsFromBody(body, parsed.urls);
       const okCount = results.filter((item) => item.ok).length;
-      const credits = creditsFromResponse(res, body, okCount || parsed.urls.length);
+      const credits = creditsFromResponse(res, body, okCount);
       debitCredits(credits);
       setBatchResult({
         urls: parsed.urls,
@@ -754,15 +849,21 @@ export default function Playground() {
         return;
       }
       const rec = asRecord(body);
-      const credits = creditsFromResponse(res, body, 8);
+      const tables = tablesFromExtract(body);
+      const empty = tables.length === 0;
+      // Product copy: 8 credits on success; failed / empty extracts are not billed.
+      // The card-lane API currently returns 200 + { tables: [] } and still deducts 8
+      // (no refund endpoint). Workbench treats zero usable rows as a miss.
+      const credits = empty ? 0 : creditsFromResponse(res, body, 8);
       debitCredits(credits);
       setExtractResult({
         url: target,
         intent,
-        tables: tablesFromExtract(body),
+        tables,
         data: rec?.data ?? body,
         jsonRaw: body,
         credits,
+        empty,
         ms,
       });
     } catch {
@@ -1031,6 +1132,9 @@ export default function Playground() {
                 >
                   {isReading ? "Reading..." : "Skim it"}
                 </button>
+                {!url.trim() && key && !isReading && (
+                  <p className="text-xs text-muted-foreground">Enter a URL to run this mode.</p>
+                )}
                 {readError && (
                   <p className="text-[13px] text-destructive font-medium bg-destructive/10 p-3 rounded-lg border border-destructive/20 leading-relaxed">
                     {readError}
@@ -1095,6 +1199,9 @@ export default function Playground() {
                 >
                   {isBatching ? "Reading pages..." : "Read these pages"}
                 </button>
+                {batchUrlCount === 0 && key && !isBatching && (
+                  <p className="text-xs text-muted-foreground">Enter a URL to run this mode.</p>
+                )}
                 {batchError && (
                   <p className="text-[13px] text-destructive font-medium bg-destructive/10 p-3 rounded-lg border border-destructive/20 leading-relaxed">
                     {batchError}
@@ -1152,6 +1259,9 @@ export default function Playground() {
                 >
                   {isExtracting ? "Extracting..." : "Extract table"}
                 </button>
+                {!extractUrl.trim() && key && !isExtracting && (
+                  <p className="text-xs text-muted-foreground">Enter a URL to run this mode.</p>
+                )}
                 {extractError && (
                   <p className="text-[13px] text-destructive font-medium bg-destructive/10 p-3 rounded-lg border border-destructive/20 leading-relaxed">
                     {extractError}
@@ -1193,6 +1303,9 @@ export default function Playground() {
                   >
                     {isRegisteringWatch ? "Registering..." : "Register watch"}
                   </button>
+                  {watchUrlCount === 0 && key && !isRegisteringWatch && (
+                    <p className="text-xs text-muted-foreground">Enter a URL to run this mode.</p>
+                  )}
                 </form>
 
                 {watchSession && (
@@ -1336,7 +1449,16 @@ export default function Playground() {
                               {copiedMarkdown ? "Copied to clipboard" : "Copy Markdown"}
                             </button>
                           </div>
-                          <div className="flex-1 overflow-auto p-6">
+                          <div className="flex-1 overflow-auto p-6 space-y-4">
+                            {thinContentMessages(currentResult.jsonRaw).map((message) => (
+                              <p
+                                key={message}
+                                data-testid="status-thin-content"
+                                className="text-[13px] leading-relaxed bg-[#fde68a]/60 text-[#5a4500] p-3 rounded-lg border border-[#fde68a]"
+                              >
+                                {message}
+                              </p>
+                            ))}
                             <pre className="text-[13px] leading-[1.8] font-mono whitespace-pre-wrap text-foreground/80 break-words">
                               {currentResult.markdown}
                             </pre>
@@ -1410,9 +1532,19 @@ export default function Playground() {
                                </span>
                              </div>
                              {item.ok ? (
-                               <pre className="text-[13px] leading-relaxed font-mono whitespace-pre-wrap text-foreground/80 max-h-64 overflow-auto">
-                                 {item.data?.markdown || JSON.stringify(item.data, null, 2)}
-                               </pre>
+                               <div className="space-y-3">
+                                 {thinContentMessages(item.data).map((message) => (
+                                   <p
+                                     key={message}
+                                     className="text-[13px] leading-relaxed bg-[#fde68a]/60 text-[#5a4500] p-3 rounded-lg border border-[#fde68a]"
+                                   >
+                                     {message}
+                                   </p>
+                                 ))}
+                                 <pre className="text-[13px] leading-relaxed font-mono whitespace-pre-wrap text-foreground/80 max-h-64 overflow-auto">
+                                   {item.data?.markdown || JSON.stringify(item.data, null, 2)}
+                                 </pre>
+                               </div>
                              ) : (
                                <p className="text-[13px] text-destructive">
                                  {typeof item.error === "string"
@@ -1444,10 +1576,14 @@ export default function Playground() {
                      <div className="flex items-center gap-4 text-[13px] font-mono font-medium" data-testid="status-extract-receipt">
                        <span className="text-foreground/70">{extractResult.ms} ms</span>
                        <span className="text-foreground/70">
-                         {extractResult.tables.length} table{extractResult.tables.length === 1 ? "" : "s"}
+                         {extractResult.empty
+                           ? "No table found"
+                           : `${extractResult.tables.length} table${extractResult.tables.length === 1 ? "" : "s"}`}
                        </span>
                        <span className="bg-[#fde68a] text-[#5a4500] px-2 py-0.5 rounded-md">
-                         {creditLabel(extractResult.credits)}
+                         {extractResult.empty || extractResult.credits === 0
+                           ? "Not charged"
+                           : creditLabel(extractResult.credits)}
                        </span>
                      </div>
                    </div>
@@ -1467,7 +1603,7 @@ export default function Playground() {
                          </TabsList>
                        </div>
                        <TabsContent value="rows" className="flex-1 p-6 overflow-auto m-0 outline-none">
-                         <ExtractedTables tables={extractResult.tables} fallback={extractResult.data} />
+                         <ExtractedTables tables={extractResult.tables} empty={extractResult.empty} />
                        </TabsContent>
                        <TabsContent value="json" className="flex-1 p-6 overflow-auto m-0 outline-none">
                          <pre className="text-[12px] leading-relaxed font-mono whitespace-pre-wrap text-foreground/80">

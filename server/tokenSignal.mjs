@@ -1,6 +1,8 @@
 /**
  * Signals sidecar (card-lane):
- *   GET /api/t/signal/sample          unauthenticated example item, charged: 0
+ *   GET /api/signals                  unauthenticated machine catalog
+ *   GET /signals.json                 same catalog (static twin in public/)
+ *   GET /api/t/signal/sample          unauthenticated bazaar example, charged: 0
  *   GET /api/t/signal/:slug/latest    honesty wrap when since= or If-None-Match
  *   GET /api/t/feeds/x402/latest      same honesty wrap (x402 is not /signal/{slug})
  *
@@ -9,7 +11,7 @@
  * This wrapper refunds on the same sk402_ ledger (opts.refundCredits) and
  * returns 304 or { items: [], unchanged: true, charged: 0 }.
  *
- * No feed store lives in this repo — the sample is a dated real ai-news item.
+ * No feed store lives in this repo — the sample is the 402 bazaar example.
  * Do not mount a sibling tokenWatch.mjs from another branch for /api/t/watch*.
  *
  * Production Express (same host as /api/t/read):
@@ -19,6 +21,9 @@
  *   }));
  */
 
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   connectMiddleware,
   getBearerToken,
@@ -32,42 +37,70 @@ import {
 
 export const SIGNAL_CREDITS = 2;
 
-export const SIGNAL_SAMPLE = {
-  sample: true,
-  charged: 0,
-  label: "Sample — last cached AI Tech item (captured 2026-08-24). Not billed.",
+const CATALOG_PATH = join(dirname(fileURLToPath(import.meta.url)), "../public/signals.json");
+
+export function loadSignalCatalog() {
+  return JSON.parse(readFileSync(CATALOG_PATH, "utf8"));
+}
+
+/** Exact bazaar output.example from GET /api/v2/signal/ai-news/latest payment-required. */
+export const SIGNAL_BAZAAR_EXAMPLE = {
   feed: "ai-news",
-  asOf: "2026-08-24T04:51:58.573Z",
+  asOf: "2026-07-13T12:00:00Z",
   ttlSeconds: 600,
   crawl: {
     status: "ok",
-    lastCrawlAt: "2026-08-24T04:51:58.573Z",
-    durationMs: 618,
+    lastCrawlAt: "2026-07-13T12:00:00Z",
+    durationMs: 1800,
   },
-  count: 1,
+  count: 2,
   items: [
     {
-      id: 68423,
+      id: 101,
       kind: "story",
-      title: "Explain it to me like I'm ten",
-      summary: "Hacker News front page: 100 points, 42 comments.",
+      title: "New open-weights model tops reasoning benchmarks",
+      summary: "Hacker News front page: 412 points, 187 comments.",
       source: "hackernews",
-      url: "https://timharford.com/2026/08/explain-it-to-me-like-im-ten/",
+      url: "https://example.com/model-announcement",
       payload: {
-        by: "bookofjoe",
-        hnId: 49411020,
-        score: 100,
-        comments: 42,
-        postedAt: "2026-08-23T18:08:13.000Z",
-        discussionUrl: "https://news.ycombinator.com/item?id=49411020",
+        hnId: 48880000,
+        score: 412,
+        comments: 187,
+        discussionUrl: "https://news.ycombinator.com/item?id=48880000",
       },
-      at: "2026-08-24T04:51:58.532Z",
+      at: "2026-07-13T11:40:00Z",
+    },
+    {
+      id: 100,
+      kind: "vendor_news",
+      title: "Introducing our next-generation API",
+      summary:
+        "Official OpenAI announcement: a faster, cheaper flagship model tier for production agents.",
+      source: "openai",
+      url: "https://openai.com/news/example",
+      payload: {
+        vendor: "OpenAI",
+        publishedAt: "2026-07-13T10:00:00Z",
+      },
+      at: "2026-07-13T11:40:00Z",
     },
   ],
 };
 
+export const SIGNAL_SAMPLE = {
+  sample: true,
+  charged: 0,
+  label:
+    "Bazaar example from GET /api/v2/signal/ai-news/latest payment-required header (asOf 2026-07-13). Not billed.",
+  ...SIGNAL_BAZAAR_EXAMPLE,
+};
+
 export function asRecord(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+export function isSignalCatalogPath(path) {
+  return path === "/api/signals" || path === "/signals.json";
 }
 
 export function isSignalSamplePath(path) {
@@ -80,7 +113,7 @@ export function isSignalPollPath(path) {
 }
 
 export function isSignalSidecarPath(path) {
-  return isSignalSamplePath(path) || isSignalPollPath(path);
+  return isSignalCatalogPath(path) || isSignalSamplePath(path) || isSignalPollPath(path);
 }
 
 export function parseSince(value) {
@@ -173,6 +206,9 @@ export function createSignalHandler(opts = {}) {
 
   return async function handleSignal(request) {
     const path = (request.url ?? "").split("?")[0].replace(/\/+$/, "") || "/";
+    if (isSignalCatalogPath(path)) {
+      return { status: 200, body: loadSignalCatalog() };
+    }
     if (isSignalSamplePath(path)) {
       return { status: 200, body: { ...SIGNAL_SAMPLE } };
     }
@@ -325,6 +361,10 @@ export function wrapSignalHonestyResponse(res, ctx = {}) {
 export function tokenSignalFilterMiddleware(opts = {}) {
   return function signalFilter(req, res, next) {
     const path = (req.url ?? "").split("?")[0].replace(/\/+$/, "") || "/";
+    if (isSignalCatalogPath(path)) {
+      sendJson(res, 200, loadSignalCatalog());
+      return;
+    }
     if (isSignalSamplePath(path)) {
       sendJson(res, 200, { ...SIGNAL_SAMPLE });
       return;

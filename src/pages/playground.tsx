@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { fetchAccountCredits } from "@/lib/accountCredits";
-import { SIGNAL_CATALOG, signalPollPath, type SignalFilterKey } from "@/lib/signals";
+import { SIGNAL_CATALOG, signalKeyPath, signalPollPath, type SignalFilterKey } from "@/lib/signals";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
 const SESSION_KEY_STORAGE = "skim-workbench-trial-key";
@@ -1902,7 +1902,7 @@ export default function Playground() {
                     ))}
                   </select>
                   <p className="mt-2 text-xs text-muted-foreground font-mono">
-                    GET /api{signalPollPath(activeSignal.slug)}
+                    GET {signalKeyPath(activeSignal.slug)}
                   </p>
                 </div>
                 <div>

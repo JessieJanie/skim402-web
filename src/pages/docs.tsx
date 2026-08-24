@@ -2014,9 +2014,12 @@ const feed = await res.json();`}
 
             <H2 id="signals">The Skim Signal series</H2>
             <P>
-              Fifteen vertical intelligence feeds, one pattern:{" "}
-              <InlineCode>GET /v2/signal/&lt;slug&gt;/latest</InlineCode> —{" "}
-              <InlineCode>$0.005</InlineCode> per poll, refreshed on a
+              Seventeen vertical intelligence feeds, one pattern:{" "}
+              <InlineCode>GET /api/t/signal/&lt;slug&gt;/latest</InlineCode>{" "}
+              (API key, 2 credits) or{" "}
+              <InlineCode>GET /api/v2/signal/&lt;slug&gt;/latest</InlineCode>{" "}
+              (wallet,{" "}
+              <InlineCode>$0.005</InlineCode>) per poll, refreshed on a
               10-minute cycle, with the same stale-serve guarantee as the
               ecosystem feed: if an upstream source is down you still get the
               last good items, and <InlineCode>crawl.status</InlineCode>{" "}
@@ -2036,8 +2039,13 @@ const feed = await res.json();`}
             <P>
               See the JSON shape without spending credits:{" "}
               <InlineCode>GET /api/t/signal/sample</InlineCode> is
-              unauthenticated, returns one dated AI Tech item, and is never
-              billed. Request a missing vertical at{" "}
+              unauthenticated and returns the bazaar example already embedded
+              in the wallet{" "}
+              <InlineCode>402 payment-required</InlineCode> header — never
+              billed. The machine catalog is{" "}
+              <InlineCode>GET /api/signals</InlineCode> or{" "}
+              <InlineCode>/signals.json</InlineCode>
+              . Request a missing vertical at{" "}
               <Link href="/signals/request" className="text-primary hover:underline">
                 /signals/request
               </Link>
@@ -2077,7 +2085,7 @@ const feed = await res.json();`}
               A few feeds accept extra filters — see the table and the filter
               details below.
             </P>
-            <H3>The fifteen feeds</H3>
+            <H3>The seventeen vertical feeds</H3>
             <div className="overflow-x-auto rounded-xl border border-border">
               <table className="w-full text-sm">
                 <thead>
@@ -2127,19 +2135,39 @@ const feed = await res.json();`}
 const feed = await res.json();`}
             </Code>
             <H3>Response items</H3>
+            <P>
+              The on-page sample and{" "}
+              <InlineCode>GET /api/t/signal/sample</InlineCode> reuse this
+              object from the wallet{" "}
+              <InlineCode>402 payment-required</InlineCode> bazaar example —
+              both items, not a shortened slice.
+            </P>
             <Code>
 {`{
   "feed": "ai-news",
   "asOf": "2026-07-13T12:00:00Z",
-  "crawl": { "status": "ok", "lastCrawlAt": "2026-07-13T12:00:00Z" },
+  "ttlSeconds": 600,
+  "crawl": { "status": "ok", "lastCrawlAt": "2026-07-13T12:00:00Z", "durationMs": 1800 },
+  "count": 2,
   "items": [
     {
+      "id": 101,
       "kind": "story",
       "title": "New open-weights model tops reasoning benchmarks",
       "summary": "Hacker News front page: 412 points, 187 comments.",
       "source": "hackernews",
       "url": "https://example.com/model-announcement",
-      "payload": { "score": 412, "comments": 187 },
+      "payload": { "hnId": 48880000, "score": 412, "comments": 187, "discussionUrl": "https://news.ycombinator.com/item?id=48880000" },
+      "at": "2026-07-13T11:40:00Z"
+    },
+    {
+      "id": 100,
+      "kind": "vendor_news",
+      "title": "Introducing our next-generation API",
+      "summary": "Official OpenAI announcement: a faster, cheaper flagship model tier for production agents.",
+      "source": "openai",
+      "url": "https://openai.com/news/example",
+      "payload": { "vendor": "OpenAI", "publishedAt": "2026-07-13T10:00:00Z" },
       "at": "2026-07-13T11:40:00Z"
     }
   ]
@@ -2151,9 +2179,12 @@ const feed = await res.json();`}
               SEC items carry the form type and its plain-language meaning,
               deal items carry price and retailer, paper items carry authors
               and an abstract excerpt, and so on. The envelope is identical
-              across all fifteen. (The sixteenth feed in the
-              Signal series is the x402 ecosystem feed, documented above —
-              it lives at its own path.)
+              across all seventeen verticals. The x402 ecosystem feed is not
+              an 18th <InlineCode>/signal/{"{slug}"}</InlineCode> — it
+              lives at{" "}
+              <InlineCode>GET /api/t/feeds/x402/latest</InlineCode> (wallet:{" "}
+              <InlineCode>/api/v2/feeds/x402/latest</InlineCode>), documented
+              above. Watch and Custom are not catalog Signals.
             </P>
             <H3>Filter details</H3>
             <div className="rounded-xl border border-border bg-card px-6">
@@ -2309,8 +2340,14 @@ curl "https://skim402.com/api/t/feeds/x402/latest?limit=25" \\
   -H "Authorization: Bearer sk402_YOUR_KEY"`}
               </Code>
               <Field name="GET /t/signal/sample" type="free">
-                Unauthenticated dated AI Tech item so you can see the JSON
-                shape. <InlineCode>charged: 0</InlineCode>. Not a poll.
+                Unauthenticated bazaar example from the wallet 402
+                payment-required header. <InlineCode>charged: 0</InlineCode>.
+                Not a poll.
+              </Field>
+              <Field name="GET /api/signals" type="free">
+                Unauthenticated machine catalog (slug, title, keyPath,
+                walletPath, credits, filters, sources). Same body as{" "}
+                <InlineCode>/signals.json</InlineCode>.
               </Field>
               <Field name="GET /t/signal/:slug/latest" type="2 credits">
                 Token-gated access to any{" "}

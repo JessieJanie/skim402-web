@@ -6,6 +6,8 @@ import { ArrowRight } from "lucide-react";
 import {
   SIGNAL_CATALOG,
   SIGNAL_SAMPLE_EXAMPLE,
+  signalKeyPath,
+  signalWalletPath,
   type SignalEntry,
 } from "@/lib/signals";
 
@@ -24,6 +26,9 @@ type SamplePayload = {
   label?: string;
   feed?: string;
   asOf?: string;
+  ttlSeconds?: number;
+  crawl?: { status?: string; lastCrawlAt?: string; durationMs?: number };
+  count?: number;
   items?: SampleItem[];
 };
 
@@ -48,7 +53,20 @@ function SignalCard({ s, muted = false }: { s: SignalEntry; muted?: boolean }) {
         <h2 className="text-lg font-bold">{s.name}</h2>
         <span className="text-xs font-medium text-primary whitespace-nowrap">{s.price}</span>
       </div>
-      <code className="font-mono text-xs text-muted-foreground mb-3 block">{s.endpoint}</code>
+      <div className="font-mono text-xs text-muted-foreground mb-3 space-y-2">
+        <p>
+          <span className="block text-[10px] font-semibold uppercase tracking-wider text-primary mb-0.5">
+            API key · 2 credits
+          </span>
+          <code>GET {signalKeyPath(s.slug)}</code>
+        </p>
+        <p>
+          <span className="block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">
+            Wallet · USDC
+          </span>
+          <code>GET {signalWalletPath(s.slug)}</code>
+        </p>
+      </div>
       <p className="text-sm text-muted-foreground leading-relaxed mb-3 flex-1">{s.blurb}</p>
       <p className="text-xs text-muted-foreground/80 mb-4">Sources: {s.sources}</p>
       <a
@@ -66,12 +84,11 @@ export default function Signals() {
   useDocumentMeta({
     title: "Signals — intelligence feeds for AI agents | Skim",
     description:
-      "Skim Signals: structured intelligence feeds for AI agents. Poll with a free sk402_ API key (2 credits per poll). Wallet pay is optional. Eighteen live feeds — try one in the Workbench.",
+      "Skim Signals: 17 vertical /signal/{slug} feeds plus the x402 ecosystem feed. Poll with a free sk402_ API key (2 credits). Wallet pay is optional.",
     canonical: "https://skim402.com/signals",
   });
 
   const [sample, setSample] = useState<SamplePayload>(SIGNAL_SAMPLE_EXAMPLE);
-  const [sampleKind, setSampleKind] = useState<"example" | "live">("example");
 
   useEffect(() => {
     let cancelled = false;
@@ -81,8 +98,9 @@ export default function Signals() {
         if (!res.ok) return;
         const body = (await res.json().catch(() => null)) as SamplePayload | null;
         if (cancelled || !body || !Array.isArray(body.items) || body.items.length === 0) return;
+        const firstTitle = body.items[0]?.title;
+        if (firstTitle !== SIGNAL_SAMPLE_EXAMPLE.items[0].title) return;
         setSample(body);
-        setSampleKind("live");
       })
       .catch(() => {
         // Keep the dated example when the sample route is not mounted yet.
@@ -93,11 +111,13 @@ export default function Signals() {
   }, []);
 
   const item = sample.items?.[0] ?? SIGNAL_SAMPLE_EXAMPLE.items[0];
-  const jsonSlice = {
-    feed: sample.feed ?? "ai-news",
-    asOf: sample.asOf,
-    charged: sample.charged ?? 0,
-    item,
+  const sampleJson = {
+    feed: sample.feed ?? SIGNAL_SAMPLE_EXAMPLE.feed,
+    asOf: sample.asOf ?? SIGNAL_SAMPLE_EXAMPLE.asOf,
+    ttlSeconds: sample.ttlSeconds ?? SIGNAL_SAMPLE_EXAMPLE.ttlSeconds,
+    crawl: sample.crawl ?? SIGNAL_SAMPLE_EXAMPLE.crawl,
+    count: sample.count ?? SIGNAL_SAMPLE_EXAMPLE.count,
+    items: sample.items ?? SIGNAL_SAMPLE_EXAMPLE.items,
   };
 
   return (
@@ -113,7 +133,8 @@ export default function Signals() {
             they matter.
           </p>
           <p className="mt-6 text-lg font-medium text-foreground">
-            Eighteen Signals are live. Custom Signals are built to order — we
+            Seventeen vertical Signals are live, plus the x402 ecosystem feed.
+            Custom Signals are built to order — we
             aim to reply within two business days.{" "}
             <Link href="/signals/request" className="text-primary hover:underline">
               Request yours →
@@ -181,16 +202,15 @@ export default function Signals() {
           >
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-                {sampleKind === "live" ? "Sample item · not billed" : "Example item · not billed"}
+                Bazaar example · not billed
               </p>
               <span className="text-xs font-medium text-muted-foreground">
                 {sample.feed ?? "ai-news"} · {formatWhen(item.at || sample.asOf)}
               </span>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              {sample.label ?? SIGNAL_SAMPLE_EXAMPLE.label} This is the shape your
-              agent gets back — title, source, time, link, and a JSON slice —
-              before you spend credits on a poll.
+              {sample.label ?? SIGNAL_SAMPLE_EXAMPLE.label} Both items from that
+              header are shown in the JSON below — no invented rows.
             </p>
             <h2 className="text-xl font-bold mb-2">{item.title}</h2>
             <p className="text-sm text-muted-foreground mb-3">
@@ -213,11 +233,15 @@ export default function Signals() {
               ) : null}
             </p>
             <pre className="bg-muted rounded-xl p-4 font-mono text-xs overflow-x-auto whitespace-pre-wrap text-left">
-              {JSON.stringify(jsonSlice, null, 2)}
+              {JSON.stringify(sampleJson, null, 2)}
             </pre>
             <p className="mt-4 text-xs text-muted-foreground">
               Unauthenticated sample:{" "}
               <code className="font-mono">GET /api/t/signal/sample</code>
+              {" "}· machine catalog:{" "}
+              <code className="font-mono">GET /api/signals</code>
+              {" "}or{" "}
+              <code className="font-mono">/signals.json</code>
               {" "}· charged 0. Poll the live feed with your key in the{" "}
               <Link href="/playground?mode=signal" className="text-primary hover:underline">
                 Workbench
@@ -271,8 +295,8 @@ export default function Signals() {
             <h2 className="text-lg font-bold mb-2">Skim Watch is not a catalog Signal</h2>
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               Watch is a Workbench mode: you register the exact pages your agent
-              cares about, then ask what changed. It is not one of the eighteen
-              vertical feeds. Same{" "}
+              cares about, then ask what changed. It is not one of the seventeen
+              vertical Signals. Same{" "}
               <code className="font-mono text-xs text-foreground">sk402_</code>{" "}
               key as reads and Signals.
             </p>
@@ -281,7 +305,7 @@ export default function Signals() {
                 Try Watch in the Workbench
                 <ArrowRight className="h-3.5 w-3.5" />
               </Link>
-              <a href="/docs#watch" className="text-primary hover:underline inline-flex items-center gap-1">
+              <a href="/docs/#watch" className="text-primary hover:underline inline-flex items-center gap-1">
                 Watch docs
                 <ArrowRight className="h-3.5 w-3.5" />
               </a>
@@ -316,7 +340,7 @@ export default function Signals() {
             <p className="text-muted-foreground mb-6">
               Swap <code className="font-mono text-xs">ai-news</code> for any
               Signal in the catalog. The x402 ecosystem feed is{" "}
-              <code className="font-mono text-xs">GET /t/feeds/x402/latest</code>
+              <code className="font-mono text-xs">GET /api/t/feeds/x402/latest</code>
               . No plan yet?{" "}
               <Link href="/" className="text-primary hover:underline">
                 Create a free key
@@ -326,7 +350,7 @@ export default function Signals() {
                 start the Free Plan
               </Link>
               . Wallet pay is optional — see the{" "}
-              <a href="/docs#payment" className="text-primary hover:underline">
+              <a href="/docs/#payment" className="text-primary hover:underline">
                 payment section of the docs
               </a>
               .

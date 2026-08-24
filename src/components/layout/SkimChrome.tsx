@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { Show, useClerk, useUser } from "@clerk/react";
 import {
@@ -24,6 +25,7 @@ function getInitials(name?: string | null, email?: string) {
 export function SkimNav() {
   const { signOut } = useClerk();
   const { user } = useUser();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <nav className="skim-nav">
@@ -31,7 +33,18 @@ export function SkimNav() {
         <span className="skim-mark">S</span>
         <span className="skim-wordmark">SKIM</span>
       </Link>
-      <div className="skim-navlinks">
+      <button
+        type="button"
+        className="skim-nav-toggle"
+        aria-label={menuOpen ? "Close menu" : "Open menu"}
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+      <div className={`skim-navlinks${menuOpen ? " is-open" : ""}`} onClick={() => setMenuOpen(false)}>
         <Link href="/playground">Workbench</Link>
         <Link href="/signals">Signals</Link>
         <Link href="/pricing">Plans</Link>

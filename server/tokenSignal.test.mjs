@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  SIGNAL_BAZAAR_EXAMPLE,
   SIGNAL_CREDITS,
   SIGNAL_SAMPLE,
   createSignalHandler,
   etagsMatch,
+  isSignalCatalogPath,
   isSignalPollPath,
   isSignalSamplePath,
   isUnchangedFeed,
+  loadSignalCatalog,
   parseSince,
   unchangedBody,
   wrapSignalHonestyResponse,
@@ -48,6 +51,9 @@ const FEED = {
 };
 
 test("sample and poll path matchers", () => {
+  assert.equal(isSignalCatalogPath("/api/signals"), true);
+  assert.equal(isSignalCatalogPath("/signals.json"), true);
+  assert.equal(isSignalCatalogPath("/signals"), false);
   assert.equal(isSignalSamplePath("/api/t/signal/sample"), true);
   assert.equal(isSignalSamplePath("/api/t/signals/sample"), true);
   assert.equal(isSignalPollPath("/api/t/signal/ai-news/latest"), true);
@@ -55,6 +61,37 @@ test("sample and poll path matchers", () => {
   assert.equal(isSignalPollPath("/api/t/signal/sample"), false);
   assert.equal(isSignalPollPath("/api/t/watch/diff"), false);
   assert.equal(isSignalPollPath("/api/t/signal/ai-news"), false);
+});
+
+test("machine catalog is 17 vertical + x402 with labeled paths", () => {
+  const catalog = loadSignalCatalog();
+  assert.equal(catalog.verticalCount, 17);
+  assert.equal(catalog.signals.length, 18);
+  const slugs = catalog.signals.map((s) => s.slug);
+  assert.equal(slugs.filter((s) => s === "x402").length, 1);
+  assert.equal(slugs.includes("watch"), false);
+  const vertical = catalog.signals.filter((s) => s.slug !== "x402");
+  assert.equal(vertical.length, 17);
+  const ai = catalog.signals.find((s) => s.slug === "ai-news");
+  assert.equal(ai.keyPath, "/api/t/signal/ai-news/latest");
+  assert.equal(ai.walletPath, "/api/v2/signal/ai-news/latest");
+  assert.equal(ai.credits, 2);
+  const x402 = catalog.signals.find((s) => s.slug === "x402");
+  assert.equal(x402.keyPath, "/api/t/feeds/x402/latest");
+  assert.equal(x402.walletPath, "/api/v2/feeds/x402/latest");
+});
+
+test("sample is the 402 bazaar example, not an invented live item", async () => {
+  assert.equal(SIGNAL_SAMPLE.items[0].id, 101);
+  assert.equal(SIGNAL_SAMPLE.items[1].id, 100);
+  assert.deepEqual(SIGNAL_SAMPLE.items, SIGNAL_BAZAAR_EXAMPLE.items);
+  assert.equal(SIGNAL_SAMPLE.asOf, "2026-07-13T12:00:00Z");
+  const handle = createSignalHandler({ fetch: mockFetch({}) });
+  const catalog = await handle({ method: "GET", url: "/api/signals", headers: {} });
+  assert.equal(catalog.status, 200);
+  assert.equal(catalog.body.verticalCount, 17);
+  const sample = await handle({ method: "GET", url: "/api/t/signal/sample", headers: {} });
+  assert.equal(sample.body.items[0].title, "New open-weights model tops reasoning benchmarks");
 });
 
 test("since= and If-None-Match detect an unchanged feed", () => {

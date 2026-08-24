@@ -1,0 +1,170 @@
+{
+  "verticalCount": 17,
+  "x402": true,
+  "note": "17 vertical /signal/{slug} feeds plus the x402 ecosystem feed at /feeds/x402. Watch and Custom are not catalog Signals.",
+  "credits": 2,
+  "signals": [
+    {
+      "slug": "ai-news",
+      "title": "AI Tech Signal",
+      "keyPath": "/api/t/signal/ai-news/latest",
+      "walletPath": "/api/v2/signal/ai-news/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "Hacker News, arXiv, vendor announcements"
+    },
+    {
+      "slug": "security",
+      "title": "Security Signal",
+      "keyPath": "/api/t/signal/security/latest",
+      "walletPath": "/api/v2/signal/security/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "CISA advisories"
+    },
+    {
+      "slug": "research",
+      "title": "Research Signal",
+      "keyPath": "/api/t/signal/research/latest",
+      "walletPath": "/api/v2/signal/research/latest",
+      "credits": 2,
+      "filters": ["fields"],
+      "sources": "arXiv"
+    },
+    {
+      "slug": "sec-filings",
+      "title": "SEC Filings Signal",
+      "keyPath": "/api/t/signal/sec-filings/latest",
+      "walletPath": "/api/v2/signal/sec-filings/latest",
+      "credits": 2,
+      "filters": ["forms"],
+      "sources": "SEC EDGAR"
+    },
+    {
+      "slug": "x402",
+      "title": "x402 Signal",
+      "keyPath": "/api/t/feeds/x402/latest",
+      "walletPath": "/api/v2/feeds/x402/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "x402-list.com, 402index.io"
+    },
+    {
+      "slug": "crypto-news",
+      "title": "Crypto Signal",
+      "keyPath": "/api/t/signal/crypto-news/latest",
+      "walletPath": "/api/v2/signal/crypto-news/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "CoinDesk, Cointelegraph, Decrypt, The Block"
+    },
+    {
+      "slug": "macro",
+      "title": "Macro Signal",
+      "keyPath": "/api/t/signal/macro/latest",
+      "walletPath": "/api/v2/signal/macro/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "Federal Reserve, SEC press releases"
+    },
+    {
+      "slug": "regulations",
+      "title": "Regulations Signal",
+      "keyPath": "/api/t/signal/regulations/latest",
+      "walletPath": "/api/v2/signal/regulations/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "Federal Register (official API)"
+    },
+    {
+      "slug": "courts",
+      "title": "Courts Signal",
+      "keyPath": "/api/t/signal/courts/latest",
+      "walletPath": "/api/v2/signal/courts/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "CourtListener (Free Law Project)"
+    },
+    {
+      "slug": "recalls",
+      "title": "Recalls Signal",
+      "keyPath": "/api/t/signal/recalls/latest",
+      "walletPath": "/api/v2/signal/recalls/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "CPSC, FDA"
+    },
+    {
+      "slug": "deals",
+      "title": "Deals Signal",
+      "keyPath": "/api/t/signal/deals/latest",
+      "walletPath": "/api/v2/signal/deals/latest",
+      "credits": 2,
+      "filters": ["categories"],
+      "sources": "Slickdeals, DealNews"
+    },
+    {
+      "slug": "launches",
+      "title": "Launches Signal",
+      "keyPath": "/api/t/signal/launches/latest",
+      "walletPath": "/api/v2/signal/launches/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "Product Hunt"
+    },
+    {
+      "slug": "energy",
+      "title": "Energy Signal",
+      "keyPath": "/api/t/signal/energy/latest",
+      "walletPath": "/api/v2/signal/energy/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "EIA Today in Energy, EIA Press Room"
+    },
+    {
+      "slug": "campaign-finance",
+      "title": "Campaign Finance Signal",
+      "keyPath": "/api/t/signal/campaign-finance/latest",
+      "walletPath": "/api/v2/signal/campaign-finance/latest",
+      "credits": 2,
+      "filters": ["forms", "committees"],
+      "sources": "FEC electronic filing system"
+    },
+    {
+      "slug": "trending",
+      "title": "Trending Signal",
+      "keyPath": "/api/t/signal/trending/latest",
+      "walletPath": "/api/v2/signal/trending/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "Google Trends (US)"
+    },
+    {
+      "slug": "entertainment",
+      "title": "Entertainment Signal",
+      "keyPath": "/api/t/signal/entertainment/latest",
+      "walletPath": "/api/v2/signal/entertainment/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "Deadline, Variety, The Hollywood Reporter, TheWrap"
+    },
+    {
+      "slug": "studio-jobs",
+      "title": "Studio Jobs Signal",
+      "keyPath": "/api/t/signal/studio-jobs/latest",
+      "walletPath": "/api/v2/signal/studio-jobs/latest",
+      "credits": 2,
+      "filters": [],
+      "sources": "Studio ATS APIs (Eightfold, Phenom, TalentBrew, amazon.jobs, SmartRecruiters)"
+    },
+    {
+      "slug": "film-incentives",
+      "title": "Film Incentives Signal",
+      "keyPath": "/api/t/signal/film-incentives/latest",
+      "walletPath": "/api/v2/signal/film-incentives/latest",
+      "credits": 2,
+      "filters": ["states"],
+      "sources": "California Film Commission, Office of the Texas Governor, per-state press coverage"
+    }
+  ]
+}

@@ -43,7 +43,7 @@ const routes = [
     lastmod: "2026-08-17",
     title: "Skim — Web reads and Signals for AI agents",
     description:
-      "Clean web reads and structured intelligence feeds for AI agents. Free plan included — 1,000 credits a month, no credit card required. Eighteen live Signals. Pay by card on a monthly plan, or per-call in USDC by crypto wallet.",
+      "Clean web reads and structured intelligence feeds for AI agents. Free plan included — 1,000 credits a month, no credit card required. Seventeen vertical Signals plus the x402 ecosystem feed. Pay by card on a monthly plan, or per-call in USDC by crypto wallet.",
     ogTitle: "Skim — Web reads and Signals for AI agents",
     ogDescription:
       "Clean web reads and structured intelligence feeds for AI agents. Free plan included — 1,000 credits a month. Pay by card or by crypto wallet.",
@@ -144,7 +144,7 @@ const routes = [
     lastmod: "2026-08-24",
     title: "Signals — intelligence feeds for AI agents | Skim",
     description:
-      "Skim Signals: structured intelligence feeds for AI agents. Poll with a free sk402_ API key (2 credits per poll). Wallet pay is optional. Eighteen live feeds — try one in the Workbench.",
+      "Skim Signals: 17 vertical /signal/{slug} feeds plus the x402 ecosystem feed. Poll with a free sk402_ API key (2 credits). Wallet pay is optional.",
     ogTitle: "Skim Signals — intelligence feeds for agents",
     ogDescription:
       "Poll AI, security, research, and SEC feeds with a free sk402_ key. Wallet pay is optional.",

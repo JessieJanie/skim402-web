@@ -4,7 +4,8 @@
  *   POST /api/t/crawl
  *   POST /api/t/watch  (+ webhookUrl, PATCH update, GET /diff fires webhook)
  *   POST /api/t/read-pdf
- *   GET  /api/t/signal/sample  (unauthenticated dated example, charged: 0)
+ *   GET  /api/signals + /signals.json  (unauthenticated machine catalog)
+ *   GET  /api/t/signal/sample  (unauthenticated bazaar example, charged: 0)
  *   GET  /api/t/signal/:slug/latest + /api/t/feeds/x402/latest
  *        (since= / If-None-Match → 304 or unchanged + refund when host injects refundCredits)
  *
@@ -40,6 +41,8 @@ export function tokenProductsMiddleware(opts = {}) {
     if (path === "/api/t/read-pdf") return pdf(req, res, next);
     if (path.startsWith("/api/t/watch")) return watch(req, res, next);
     if (
+      path === "/api/signals" ||
+      path === "/signals.json" ||
       path === "/api/t/signal/sample" ||
       path === "/api/t/signals/sample" ||
       path === "/api/t/feeds/x402/latest" ||

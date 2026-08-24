@@ -124,8 +124,9 @@ export function createReadPdfHandler(opts = {}) {
       return {
         status: 422,
         body: {
-          error: "unprocessable",
-          message: "No extractable text in this PDF (scans and image-only files are not OCR'd)",
+          error: "empty_pdf",
+          message: "No extractable text found in this PDF (possibly image-only or encrypted)",
+          charged: 0,
         },
       };
     }

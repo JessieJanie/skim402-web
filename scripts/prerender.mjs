@@ -60,16 +60,16 @@ const routes = [
       "Try one page, several pages, extract, crawl, PDF, or watch — no curl required.",
   },
   {
-    // Alias of /playground so /workbench is not a raw client 404.
+    // Alias of /playground so /workbench and /workbench/ are the Workbench, not a 404.
     path: "/workbench",
     outFile: "workbench/index.html",
     noSitemap: true,
     title: "Reader Workbench | Skim",
     description:
-      "Try Skim in the browser: one page, several pages, extract a table, or watch a page for changes. Uses the same free trial key as a single read.",
+      "Try Skim in the browser: one page, several pages, extract a table, crawl a site, read a PDF, or watch a page for changes. Uses the same free trial key as a single read.",
     ogTitle: "Reader Workbench | Skim",
     ogDescription:
-      "Try one page, several pages, extract a table, or watch a page — no curl required.",
+      "Try one page, several pages, extract, crawl, PDF, or watch — no curl required.",
   },
   {
     path: "/pricing",
@@ -108,6 +108,17 @@ const routes = [
     // Authenticated account screen — not a useful search result.
     path: "/card/account",
     outFile: "card/account/index.html",
+    noSitemap: true,
+    title: "Your account | Skim",
+    description:
+      "Check your Skim balance: credits remaining, plan status, and pending overage. Manage billing or cancel anytime.",
+    ogTitle: "Your account | Skim",
+    ogDescription:
+      "Check your Skim balance and manage billing — your API key is your account.",
+  },
+  {
+    path: "/account",
+    outFile: "account/index.html",
     noSitemap: true,
     title: "Your account | Skim",
     description:

@@ -235,8 +235,10 @@ const SECTIONS: Section[] = [
             <InlineCode>Authorization: Bearer sk402_…</InlineCode> to{" "}
             <InlineCode>/api/t/read</InlineCode>. Copy-paste snippets are in
             the <PageLink href="/docs">docs</PageLink>. The MCP server (
-            <InlineCode>npx -y skim-mcp</InlineCode>) is the optional wallet
-            path. Connectors also live on{" "}
+            <InlineCode>npx -y skim-mcp</InlineCode>) defaults to{" "}
+            <InlineCode>SKIM_API_KEY=sk402_…</InlineCode>; wallet pay with{" "}
+            <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> is optional.
+            Connectors also live on{" "}
             <ExtLink href="https://github.com/JessieJanie/skim-tools">
               GitHub
             </ExtLink>

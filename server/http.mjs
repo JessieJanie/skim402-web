@@ -116,7 +116,7 @@ export function remainingCredits(account) {
     if (typeof value === "number" && Number.isFinite(value)) return value;
   }
   const packs = account.packCredits ?? account.packsRemaining;
-  const monthly = account.monthlyCredits ?? account.monthlyRemaining;
+  const monthly = account.planCredits ?? account.monthlyCredits ?? account.monthlyRemaining;
   if (typeof packs === "number" || typeof monthly === "number") {
     return (Number(packs) || 0) + (Number(monthly) || 0);
   }
@@ -133,6 +133,23 @@ export async function tokenRead(fetchImpl, upstream, token, url, opts = {}) {
   });
   const body = await readJsonResponse(res);
   return { status: res.status, body, headers: res.headers };
+}
+
+/** Header so a same-host honesty wrapper can reach the existing extract handler. */
+export const EXTRACT_PASSTHROUGH_HEADER = "x-skim-extract-passthrough";
+
+export async function tokenExtract(fetchImpl, upstream, token, body, extraHeaders = {}) {
+  const res = await fetchImpl(`${upstream}/api/t/extract`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...extraHeaders,
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+  const parsed = await readJsonResponse(res);
+  return { status: res.status, body: parsed, headers: res.headers };
 }
 
 export async function safeFetch(fetchImpl, rawUrl, opts = {}) {

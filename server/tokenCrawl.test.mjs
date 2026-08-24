@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   CRAWL_MAX_PAGES,
+  canonicalizePageUrl,
   createCrawlHandler,
   isSitemapIndex,
   linksFromHtml,
@@ -64,6 +65,22 @@ test("pickPages caps and filters", () => {
   assert.equal(picked.length, 2);
   assert.ok(picked.includes("https://example.com/"));
   assert.ok(picked.includes("https://example.com/docs"));
+});
+
+test("trailing-slash twins collapse before billing", () => {
+  assert.equal(canonicalizePageUrl("https://example.com"), canonicalizePageUrl("https://example.com/"));
+  assert.equal(canonicalizePageUrl("https://example.com/docs/"), "https://example.com/docs");
+  const origin = "https://example.com";
+  const picked = pickPages(
+    ["https://example.com", "https://example.com/", "https://example.com/docs", "https://example.com/docs/"],
+    origin,
+    2,
+  );
+  assert.equal(picked.length, 2);
+  const canon = new Set(picked.map((url) => canonicalizePageUrl(url)));
+  assert.equal(canon.size, 2);
+  assert.ok(canon.has("https://example.com/"));
+  assert.ok(canon.has("https://example.com/docs"));
 });
 
 function mockFetch(routes) {
@@ -153,4 +170,43 @@ test("crawl rejects unknown tokens", async () => {
     body: { url: "https://example.com" },
   });
   assert.equal(result.status, 401);
+});
+
+test("crawl does not bill example.com and example.com/ as two pages", async () => {
+  const reads = [];
+  const handle = createCrawlHandler({
+    upstream: "https://skim402.com",
+    fetchImpl: mockFetch({
+      "GET /api/card/account": { body: { packCredits: 100, planCredits: 0 } },
+      "GET /robots.txt": { status: 404, text: "no" },
+      "GET /sitemap.xml": { status: 404, text: "no" },
+      "GET /sitemap_index.xml": { status: 404, text: "no" },
+      "GET /": { text: "<html><body>Example Domain</body></html>" },
+      "GET /api/t/read": (parsed) => {
+        const target = parsed.searchParams.get("url");
+        reads.push(target);
+        return {
+          body: {
+            markdown: "Example Domain",
+            text: "Example Domain",
+            finalUrl: target,
+            metadata: { title: "Example Domain" },
+            wordCount: 2,
+          },
+        };
+      },
+    }),
+  });
+
+  const result = await handle({
+    method: "POST",
+    url: "/api/t/crawl",
+    headers: AUTH,
+    body: { url: "https://example.com", maxPages: 2 },
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.charged, 1);
+  assert.equal(result.body.pageCount, 1);
+  assert.equal(reads.length, 1);
+  assert.equal(new Set(reads.map((url) => canonicalizePageUrl(url))).size, 1);
 });

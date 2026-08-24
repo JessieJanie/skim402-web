@@ -21,6 +21,7 @@ import WalletPage from "@/pages/wallet";
 import CardPage from "@/pages/card";
 import CardSuccess from "@/pages/card-success";
 import CardAccount from "@/pages/card-account";
+import AccountRedirect from "@/pages/account";
 import ArticlesIndex from "@/pages/articles";
 import SanerWayForward from "@/pages/articles/saner-way-forward";
 import YourAgentIsNotAUser from "@/pages/articles/your-agent-is-not-a-user";
@@ -150,10 +151,8 @@ function HomeRedirect() {
   );
 }
 
-function WorkbenchRedirect() {
-  const search = typeof window !== "undefined" ? window.location.search : "";
-  const hash = typeof window !== "undefined" ? window.location.hash : "";
-  return <Redirect to={`/playground${search}${hash}`} />;
+function WorkbenchPage() {
+  return <Playground />;
 }
 
 const queryClient = new QueryClient();
@@ -203,6 +202,8 @@ function ClerkProviderWithRoutes() {
             <Route path="/card" component={CardPage} />
             <Route path="/card/success" component={CardSuccess} />
             <Route path="/card/account" component={CardAccount} />
+            <Route path="/account" component={AccountRedirect} />
+            <Route path="/account/" component={AccountRedirect} />
             <Route path="/docs" component={Docs} />
             <Route path="/signals" component={Signals} />
             <Route path="/contact" component={Contact} />
@@ -212,7 +213,9 @@ function ClerkProviderWithRoutes() {
             <Route path="/aup" component={AUP} />
             <Route path="/wallet" component={WalletPage} />
             <Route path="/playground" component={Playground} />
-            <Route path="/workbench" component={WorkbenchRedirect} />
+            <Route path="/playground/" component={Playground} />
+            <Route path="/workbench" component={WorkbenchPage} />
+            <Route path="/workbench/" component={WorkbenchPage} />
             <Route path="/articles" component={ArticlesIndex} />
             <Route path="/articles/saner-way-forward" component={SanerWayForward} />
             <Route path="/articles/your-agent-is-not-a-user" component={YourAgentIsNotAUser} />

@@ -1,5 +1,6 @@
 import React from "react";
 import { SkimBackground, SkimNav, SkimFooter } from "@/components/layout/SkimChrome";
+import { fetchAccountCredits } from "@/lib/accountCredits";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
 const SESSION_KEY_STORAGE = "skim-workbench-trial-key";
@@ -23,16 +24,27 @@ function TrialKeyBox() {
   const [run, setRun] = React.useState<TrialRunState>({ phase: "idle" });
 
   React.useEffect(() => {
+    let cancelled = false;
     try {
       const stored = window.localStorage.getItem(SESSION_KEY_STORAGE);
       if (!stored) return;
       const parsed = JSON.parse(stored) as { token?: string; credits?: number };
-      if (parsed.token?.startsWith("sk402_")) {
-        setState({ phase: "done", token: parsed.token, credits: parsed.credits ?? 0 });
-      }
+      if (!parsed.token?.startsWith("sk402_")) return;
+      setState({ phase: "done", token: parsed.token, credits: parsed.credits ?? 0 });
+      void fetchAccountCredits(API_BASE, parsed.token).then((live) => {
+        if (cancelled || live == null) return;
+        setState({ phase: "done", token: parsed.token as string, credits: live });
+        window.localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify({
+          token: parsed.token,
+          credits: live,
+        }));
+      });
     } catch {
       window.localStorage.removeItem(SESSION_KEY_STORAGE);
     }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function createKey() {
@@ -44,7 +56,8 @@ function TrialKeyBox() {
         setState({ phase: "error", message: body.error ?? "could not create key — try again" });
         return;
       }
-      const nextState = { phase: "done" as const, token: body.token, credits: body.credits ?? 1000 };
+      const live = await fetchAccountCredits(API_BASE, body.token);
+      const nextState = { phase: "done" as const, token: body.token, credits: live ?? body.credits ?? 1000 };
       setState(nextState);
       window.localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify({
         token: nextState.token,
@@ -72,6 +85,15 @@ function TrialKeyBox() {
         return;
       }
       const credits = res.headers.get("X-Skim-Fallback") === "js" ? 2 : 1;
+      const live = await fetchAccountCredits(API_BASE, state.token);
+      if (live != null) {
+        const nextState = { phase: "done" as const, token: state.token, credits: live };
+        setState(nextState);
+        window.localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify({
+          token: nextState.token,
+          credits: nextState.credits,
+        }));
+      }
       setRun({ phase: "done", markdown: body.markdown, wordCount: body.wordCount ?? 0, credits });
     } catch {
       setRun({ phase: "error", message: "couldn't reach the reader — try again" });
@@ -361,7 +383,7 @@ export default function Home() {
             <div className="skim-connect-copy"><h2>Get your agent skimming now.</h2><p>Start with a free API key. Skim reads the web so your agent doesn&apos;t have to parse HTML.</p></div>
           </div>
           <p className="skim-github">
-            Try one page, several pages, a table extract, or a watch in the{" "}
+            Try one page, several pages, a table extract, a crawl, a PDF, or a watch in the{" "}
             <a href="/playground" style={{color:"rgba(16,19,26,.42)"}}>Workbench</a>
             {" "}— no curl required.
           </p>

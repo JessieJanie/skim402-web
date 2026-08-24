@@ -4,6 +4,7 @@ import { PublicLayout } from "@/components/layout/PublicLayout";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
+import { fetchAccountCredits } from "@/lib/accountCredits";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
 const SESSION_KEY_STORAGE = "skim-workbench-trial-key";
@@ -177,6 +178,8 @@ type PdfResult = {
   outline: { title: string; level?: number }[];
   pageCount?: number | null;
   charged: number;
+  empty?: boolean;
+  message?: string;
   jsonRaw: unknown;
   ms: number;
 };
@@ -337,14 +340,33 @@ function thinContentMessages(body: unknown): string[] {
   return messages;
 }
 
+const ERROR_CODE_MESSAGES: Record<string, string> = {
+  empty_pdf: "No extractable text found in this PDF (possibly image-only or encrypted).",
+  unprocessable: "This request could not be processed.",
+  unsupported_media_type: "That URL did not return a PDF.",
+  payload_too_large: "This file is too large.",
+};
+
 function apiErrorMessage(status: number, body: unknown, fallback: string): string {
   const rec = asRecord(body);
-  const fromBody = typeof rec?.error === "string" ? rec.error : undefined;
+  const code = typeof rec?.error === "string" ? rec.error : "";
+  const message = typeof rec?.message === "string" ? rec.message : "";
   if (status === 401) return "Invalid or expired API key.";
   if (status === 402) return "Insufficient credits. Add a card for the Free Plan or use wallet pay.";
   if (status === 429) return "Rate limit exceeded. Try again in a minute.";
-  if (status === 404) return fromBody || "That endpoint was not found. Try again in a moment.";
-  return fromBody || fallback;
+  if (status === 404) return message || code || "That endpoint was not found. Try again in a moment.";
+  if (code === "empty_pdf") return message || ERROR_CODE_MESSAGES.empty_pdf;
+  return message || ERROR_CODE_MESSAGES[code] || (code && !/^[a-z0-9_]+$/i.test(code) ? code : "") || fallback;
+}
+
+function isEmptyPdfMiss(status: number, body: unknown): boolean {
+  const rec = asRecord(body);
+  if (!rec) return false;
+  if (status !== 422 && status !== 200) return false;
+  const code = typeof rec.error === "string" ? rec.error : "";
+  const message = typeof rec.message === "string" ? rec.message : "";
+  if (code === "empty_pdf") return true;
+  return /no extractable text/i.test(message);
 }
 
 function creditLabel(n: number, extra = ""): string {
@@ -383,6 +405,20 @@ function tablesFromExtract(body: unknown): ExtractedTable[] {
         ? rec.tables
         : [];
   return list.map(normalizeTable).filter((table): table is ExtractedTable => table !== null);
+}
+
+/** Empty arrays are a miss (422 + charged 0). Fetch/DNS failures stay errors. */
+function isEmptyExtractMiss(status: number, body: unknown): boolean {
+  const rec = asRecord(body);
+  if (!rec) return false;
+  if (tablesFromExtract(body).length > 0) return false;
+  const err = `${typeof rec.error === "string" ? rec.error : ""} ${typeof rec.message === "string" ? rec.message : ""}`;
+  if (/resolve|hostname|fetched|timeout|blocked/i.test(err) && !/usable rows/i.test(err)) return false;
+  if (status === 200) return true;
+  if (status === 422) {
+    return rec.error === "unprocessable" || rec.charged === 0 || /usable rows/i.test(err);
+  }
+  return false;
 }
 
 function watchUrlsFromBody(body: unknown): WatchDiffUrl[] {
@@ -650,16 +686,25 @@ export default function Playground() {
   const busy = isReading || isBatching || isExtracting || isRegisteringWatch || isCheckingWatch || isCrawling || isReadingPdf;
 
   useEffect(() => {
+    let cancelled = false;
     try {
       const stored = window.localStorage.getItem(SESSION_KEY_STORAGE);
       if (!stored) return;
       const parsed = JSON.parse(stored) as SessionKey;
-      if (typeof parsed.token === "string" && parsed.token.startsWith("sk402_")) {
-        setKey({ token: parsed.token, credits: Number(parsed.credits) || 0 });
-      }
+      if (typeof parsed.token !== "string" || !parsed.token.startsWith("sk402_")) return;
+      setKey({ token: parsed.token, credits: Number(parsed.credits) || 0 });
+      void fetchAccountCredits(API_BASE, parsed.token).then((live) => {
+        if (cancelled || live == null) return;
+        const next = { token: parsed.token, credits: live };
+        setKey(next);
+        window.localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify(next));
+      });
     } catch {
       window.localStorage.removeItem(SESSION_KEY_STORAGE);
     }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -692,6 +737,11 @@ export default function Playground() {
     }
   }, []);
 
+  const persistKey = (next: SessionKey) => {
+    setKey(next);
+    window.localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify(next));
+  };
+
   const debitCredits = (used: number) => {
     if (used <= 0) return;
     setKey((prev) => {
@@ -700,6 +750,15 @@ export default function Playground() {
       window.localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify(next));
       return next;
     });
+  };
+
+  const settleCredits = async (token: string, used = 0) => {
+    const live = await fetchAccountCredits(API_BASE, token);
+    if (live == null) {
+      debitCredits(used);
+      return;
+    }
+    persistKey({ token, credits: live });
   };
 
   const clearKeyOn401 = (status: number) => {
@@ -718,9 +777,9 @@ export default function Playground() {
         setKeyError(body?.error || "Could not create key. Please try again.");
         return;
       }
-      const nextKey = { token: body.token, credits: body.credits ?? 1000 };
-      setKey(nextKey);
-      window.localStorage.setItem(SESSION_KEY_STORAGE, JSON.stringify(nextKey));
+      const live = await fetchAccountCredits(API_BASE, body.token);
+      const nextKey = { token: body.token, credits: live ?? body.credits ?? 1000 };
+      persistKey(nextKey);
     } catch {
       setKeyError("Network error. Could not reach Skim servers.");
     } finally {
@@ -797,7 +856,7 @@ export default function Playground() {
         : creditsFromResponse(res, body, 1);
       const wordCount = body.wordCount ?? 0;
 
-      debitCredits(creditsUsed);
+      await settleCredits(key.token, creditsUsed);
 
       const newItem: HistoryItem = {
         id: Math.random().toString(36).substring(2, 9),
@@ -856,7 +915,7 @@ export default function Playground() {
       const results = batchItemsFromBody(body, parsed.urls);
       const okCount = results.filter((item) => item.ok).length;
       const credits = creditsFromResponse(res, body, okCount);
-      debitCredits(credits);
+      await settleCredits(key.token, credits);
       setBatchResult({
         urls: parsed.urls,
         stripLinks: batchStripLinks,
@@ -901,19 +960,30 @@ export default function Playground() {
       });
       const ms = Date.now() - startTime;
       const body = await res.json().catch(() => null);
+      const rec = asRecord(body);
+      const tables = tablesFromExtract(body);
+      if (isEmptyExtractMiss(res.status, body)) {
+        await settleCredits(key.token, 0);
+        setExtractResult({
+          url: target,
+          intent,
+          tables,
+          data: rec?.data ?? body,
+          jsonRaw: body,
+          credits: 0,
+          empty: true,
+          ms,
+        });
+        return;
+      }
       if (!res.ok || !body) {
         setExtractError(apiErrorMessage(res.status, body, "Extract failed. Try a page that has a table."));
         clearKeyOn401(res.status);
         return;
       }
-      const rec = asRecord(body);
-      const tables = tablesFromExtract(body);
       const empty = tables.length === 0;
-      // Product copy: 8 credits on success; failed / empty extracts are not billed.
-      // The card-lane API currently returns 200 + { tables: [] } and still deducts 8
-      // (no refund endpoint). Workbench treats zero usable rows as a miss.
       const credits = empty ? 0 : creditsFromResponse(res, body, 8);
-      debitCredits(credits);
+      await settleCredits(key.token, credits);
       setExtractResult({
         url: target,
         intent,
@@ -979,7 +1049,7 @@ export default function Playground() {
         ? rec.urls.filter((item): item is string => typeof item === "string")
         : parsed.urls;
       const credits = creditsFromResponse(res, body, urls.length || 1);
-      debitCredits(credits);
+      await settleCredits(key.token, credits);
       persistWatch({
         watchId,
         urls,
@@ -1025,7 +1095,7 @@ export default function Playground() {
       const rec = asRecord(body);
       const fallbackCredits = kind === "status" ? 0 : (Array.isArray(rec?.urls) ? rec.urls.length : 1);
       const credits = kind === "status" ? 0 : creditsFromResponse(res, body, fallbackCredits);
-      debitCredits(credits);
+      await settleCredits(key.token, credits);
       setWatchResult({
         watchId: watchSession.watchId,
         kind,
@@ -1074,7 +1144,7 @@ export default function Playground() {
       const rec = asRecord(body);
       const pages = (Array.isArray(rec?.pages) ? rec.pages : []) as CrawlPage[];
       const charged = creditsFromResponse(res, body, pages.filter((p) => p.ok).length);
-      debitCredits(charged);
+      await settleCredits(key.token, charged);
       setCrawlResult({
         startUrl: target,
         origin: typeof rec?.origin === "string" ? rec.origin : undefined,
@@ -1113,6 +1183,22 @@ export default function Playground() {
       });
       const ms = Date.now() - startTime;
       const body = await res.json().catch(() => null);
+      if (isEmptyPdfMiss(res.status, body)) {
+        await settleCredits(key.token, 0);
+        const rec = asRecord(body);
+        setPdfResult({
+          url: target,
+          markdown: "",
+          outline: [],
+          pageCount: typeof rec?.pageCount === "number" ? rec.pageCount : null,
+          charged: 0,
+          empty: true,
+          message: apiErrorMessage(res.status, body, ERROR_CODE_MESSAGES.empty_pdf),
+          jsonRaw: body,
+          ms,
+        });
+        return;
+      }
       if (!res.ok || !body) {
         setPdfError(apiErrorMessage(res.status, body, "PDF read failed. Try a smaller text PDF."));
         clearKeyOn401(res.status);
@@ -1120,7 +1206,7 @@ export default function Playground() {
       }
       const rec = asRecord(body);
       const charged = creditsFromResponse(res, body, 3);
-      debitCredits(charged);
+      await settleCredits(key.token, charged);
       const outline = Array.isArray(rec?.outline)
         ? rec.outline
             .map((item) => {
@@ -1194,7 +1280,7 @@ export default function Playground() {
             <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">1. API Key</h2>
-                {key && <Badge variant="outline" data-testid="status-session-credits" className="font-mono text-xs">{key.credits} est. credits</Badge>}
+                {key && <Badge variant="outline" data-testid="status-session-credits" className="font-mono text-xs">{key.credits} credits</Badge>}
               </div>
 
               {key ? (
@@ -1212,7 +1298,10 @@ export default function Playground() {
                      </button>
                   </div>
                   <p className="text-[13px] text-muted-foreground">
-                     Active session key. Used automatically for requests below. <Link href="/pricing" data-testid="link-get-permanent-key" className="text-[#236CFF] hover:underline">Get a permanent key</Link>.
+                     Active session key. Balance is from{" "}
+                     <Link href="/card/account" className="text-[#236CFF] hover:underline">GET /card/account</Link>
+                     . Used automatically for requests below.{" "}
+                     <Link href="/pricing" data-testid="link-get-permanent-key" className="text-[#236CFF] hover:underline">Get a permanent key</Link>.
                   </p>
                 </div>
               ) : (
@@ -2003,7 +2092,7 @@ export default function Playground() {
                          <span className="text-foreground/70">{pdfResult.pageCount} pages</span>
                        )}
                        <span className="bg-[#fde68a] text-[#5a4500] px-2 py-0.5 rounded-md">
-                         {creditLabel(pdfResult.charged)}
+                         {pdfResult.empty || pdfResult.charged === 0 ? "Not charged" : creditLabel(pdfResult.charged)}
                        </span>
                      </div>
                    </div>
@@ -2023,6 +2112,15 @@ export default function Playground() {
                          </TabsList>
                        </div>
                        <TabsContent value="markdown" className="flex-1 p-6 overflow-auto m-0 outline-none space-y-4">
+                         {pdfResult.empty ? (
+                           <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-2" data-testid="status-pdf-empty">
+                             <p className="text-sm font-semibold text-foreground">No extractable text</p>
+                             <p className="text-[13px] leading-relaxed text-muted-foreground">
+                               {pdfResult.message || ERROR_CODE_MESSAGES.empty_pdf} This PDF is not billed as a success. Raw JSON is in the next tab.
+                             </p>
+                           </div>
+                         ) : (
+                           <>
                          {pdfResult.outline.length > 0 && (
                            <div>
                              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Outline</p>
@@ -2036,6 +2134,8 @@ export default function Playground() {
                          <pre className="text-[13px] leading-[1.8] font-mono whitespace-pre-wrap text-foreground/80 break-words">
                            {pdfResult.markdown}
                          </pre>
+                           </>
+                         )}
                        </TabsContent>
                        <TabsContent value="json" className="flex-1 p-6 overflow-auto m-0 outline-none">
                          <pre className="text-[12px] leading-relaxed font-mono whitespace-pre-wrap text-foreground/80">

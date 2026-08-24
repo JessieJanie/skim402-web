@@ -386,7 +386,7 @@
       "post": {
         "operationId": "tokenExtract",
         "summary": "Schema-constrained extraction (card-lane token auth)",
-        "description": "Same extraction as /api/v2/extract. Costs 8 credits; failed extractions are refunded.",
+        "description": "Same extraction as /api/v2/extract. Costs 8 credits when at least one usable row or object is returned. Empty extracts (tables:[], rows:[], items:[], \u2026) return 422 and are not charged; if credits were already deducted they are refunded. Other failed extractions are refunded.",
         "tags": [
           "card"
         ],
@@ -425,7 +425,7 @@
         },
         "responses": {
           "200": {
-            "description": "Typed JSON matching the supplied schema"
+            "description": "Typed JSON matching the supplied schema. charged=8 when usable rows/objects are present."
           },
           "401": {
             "description": "Missing or unknown token"
@@ -434,7 +434,7 @@
             "description": "Out of credits"
           },
           "422": {
-            "description": "URL could not be fetched or had no readable content"
+            "description": "URL could not be fetched, had no readable content, or extraction returned no usable rows (not charged)"
           }
         }
       }

@@ -12,6 +12,7 @@ import Home from "@/pages/home";
 import Pricing from "@/pages/pricing";
 import Docs from "@/pages/docs";
 import Signals from "@/pages/signals";
+import SignalsRequest from "@/pages/signals-request";
 import Contact from "@/pages/contact";
 import FAQ from "@/pages/faq";
 import Privacy from "@/pages/privacy";
@@ -205,6 +206,7 @@ function ClerkProviderWithRoutes() {
             <Route path="/account" component={AccountRedirect} />
             <Route path="/account/" component={AccountRedirect} />
             <Route path="/docs" component={Docs} />
+            <Route path="/signals/request" component={SignalsRequest} />
             <Route path="/signals" component={Signals} />
             <Route path="/contact" component={Contact} />
             <Route path="/faq" component={FAQ} />

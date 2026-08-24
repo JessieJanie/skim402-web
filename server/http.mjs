@@ -393,6 +393,9 @@ export function connectMiddleware(matches, handle, opts = {}) {
         headers: req.headers,
         body,
       });
+      if (typeof opts.onResult === "function" && opts.onResult(res, result)) {
+        return;
+      }
       sendJson(res, result.status, result.body);
     } catch (err) {
       sendJson(res, 500, {

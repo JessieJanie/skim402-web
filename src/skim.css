@@ -11,7 +11,9 @@
 .skim-content { position: relative; z-index: 1; }
 
 /* Nav */
-.skim-nav { height: 72px; width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; }
+.skim-nav { position: relative; height: 72px; width: 100%; max-width: 1180px; margin: 0 auto; padding: 0 28px; display: flex; align-items: center; justify-content: space-between; }
+.skim-nav-toggle { display: none; width: 40px; height: 40px; border: 0; background: transparent; padding: 10px 8px; flex-direction: column; justify-content: center; gap: 5px; cursor: pointer; }
+.skim-nav-toggle span { display: block; height: 2px; width: 18px; background: #10131a; }
 .skim-brand { display: flex; align-items: center; gap: 9px; text-decoration: none; }
 .skim-mark { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #236CFF; color: white; font-size: 10px; font-weight: 800; }
 .skim-wordmark { color: #236CFF; font-size: 20px; font-weight: 800; letter-spacing: -.06em; }
@@ -135,9 +137,27 @@
   .skim-logos, .skim-logos.right { justify-content: center; }
   .skim-connect-copy { grid-row: 1; white-space: normal; }
 }
+@media (max-width: 640px) {
+  .skim-nav-toggle { display: flex; }
+  .skim-navlinks {
+    display: none;
+    position: absolute;
+    top: 72px;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 8px 20px 16px;
+    background: rgba(255,255,255,.96);
+    box-shadow: 0 12px 28px rgba(16,19,26,.08);
+  }
+  .skim-navlinks.is-open { display: flex; }
+  .skim-navlinks a { padding: 10px 0; }
+}
 @media (max-width: 520px) {
   .skim-nav { padding: 0 20px; }
-  .skim-navlinks { gap: 14px; }
   .skim-eyebrow { font-size: 32px; letter-spacing: .1em; }
   .skim-hero, .skim-connect, .skim-footer { padding-left: 20px; padding-right: 20px; }
   .skim-receipt { gap: 9px; }

@@ -23,7 +23,10 @@
 - POST https://skim402.com/api/t/watch — 1 credit to register. Body { "urls": [1-20], "webhookUrl"?: "https://…" }. Optional HTTPS webhook; PATCH /api/t/watch { watchId, webhookUrl } updates it. GET /api/t/watch/diff?id= — 1 credit per successful URL. When a poll finds status=changed, Skim POSTs a signed JSON payload (X-Skim-Signature: sha256=…) to webhookUrl. No email, no cron: the webhook fires on GET /diff. Cached polls do not re-fire. GET /api/t/watch/status?id= is FREE.
 - POST https://skim402.com/api/v2/watch — $0.01. Body { "urls": [1-20 URLs], "note"? }. Registers a private watch list; returns a watch id (keep it secret). GET /api/v2/watch/diff?id=<watchId> — $0.005 per poll. Re-reads every URL and returns what changed: per-URL status, added/removed line samples from clean text, change ratio, numericOnly flag. First poll baselines. Polls within 60 s return cached result ("fresh": true). GET /api/v2/watch/status?id= is FREE.
 - GET https://skim402.com/api/v2/feeds/x402/latest — $0.005 per poll (2 credits on a plan). New paid services and price changes across public x402 registries.
-- GET https://skim402.com/api/v2/signal/{name}/latest — $0.005 per poll (2 credits on a plan). Eighteen vertical intelligence feeds — see the full catalog at https://skim402.com/signals. Feed names: ai-news, sec-filings (?forms=), crypto-news, macro, security, regulations, courts, recalls, deals (?categories=), launches, trending, research (?fields=), energy, entertainment, studio-jobs, campaign-finance (?forms=&committees=), film-incentives (?states=). All feeds refresh on a 10-minute cycle; a poll that can't be served is never charged.
+- GET https://skim402.com/api/signals — FREE. Machine catalog (also /signals.json): slug, title, keyPath, walletPath, credits, filters, sources. 17 vertical /signal/{slug} feeds + x402 at /feeds/x402. Watch and Custom are not catalog Signals.
+- GET https://skim402.com/api/t/signal/sample — FREE. Bazaar example from GET /api/v2/signal/ai-news/latest payment-required (asOf 2026-07-13, items 101 and 100). Never billed.
+- GET https://skim402.com/api/t/signal/{slug}/latest — 2 credits per poll (Authorization: Bearer sk402_…). Wallet twin: GET /api/v2/signal/{slug}/latest at $0.005. A sk402_ key on /api/v2/signal/… returns 402. Slugs (17 vertical): ai-news, sec-filings (?forms=), crypto-news, macro, security, regulations, courts, recalls, deals (?categories=), launches, trending, research (?fields=), energy, entertainment, studio-jobs, campaign-finance (?forms=&committees=), film-incentives (?states=). x402 ecosystem feed is GET /api/t/feeds/x402/latest (wallet: /api/v2/feeds/x402/latest), not /signal/x402. Optional since= (ISO) or If-None-Match: when the Signals sidecar is mounted with ledger refunds, an unchanged feed returns 304 or { items: [], unchanged: true, charged: 0 }. Live Express today still bills If-None-Match 304s unless that sidecar is mounted.
+- Custom Signal requests: https://skim402.com/signals/request — emails hello@skim402.com. Reply in two business days (same as /contact). Watch is not a catalog Signal; use Workbench ?mode=watch.
 - POST https://skim402.com/api/v2/testimonial — FREE. Leave a short quote if Skim worked well — agent testimonials welcome, reviewed by a human before publication.
 - Legacy /api/v1/* paths still work at the same prices for v1-generation x402 clients.
 
@@ -34,14 +37,15 @@
 - Works with any x402 client (x402-fetch for JS, the official x402 Python SDK). Framework connectors on PyPI: langchain-skim, llama-index-readers-skim, crewai-skim, skim-haystack. MCP server: skim-mcp (npm) and io.github.JessieJanie/skim402 (official MCP Registry). Default MCP install uses `SKIM_API_KEY=sk402_…`; `SKIM_WALLET_PRIVATE_KEY` is an optional second path.
 - No wallet required: create a free API key instantly at https://skim402.com — no signup, no card, 1,000 credits included.
 - The official Apify Actor (apify.com/jessiejanie/skim-clean-reader) also offers the same reads with normal Apify billing at $4.00 per 1,000 pages.
-- Free browser demo: https://skim402.com/playground/ — same trial API key as a single read.
+- Free browser demo: https://skim402.com/playground/ — same trial API key as a single read. Signal mode: ?mode=signal.
 - Skim reads public pages only: no login walls, no credentials held — least-privilege reader by design.
 
 ## Docs and resources
 
 - [Developer docs](https://skim402.com/docs): request/response shapes, payment flow, code samples in curl, JavaScript, and Python
 - [OpenAPI spec](https://skim402.com/openapi.json): machine-readable API contract for core read/extract endpoints
-- [Signals catalog](https://skim402.com/signals): all 18 intelligence feeds with sources and poll syntax
+- [Signals catalog](https://skim402.com/signals): 17 vertical /signal/{slug} feeds plus the x402 ecosystem feed; machine JSON at /api/signals and /signals.json
+- [Request a custom Signal](https://skim402.com/signals/request): form → hello@skim402.com
 - [Plans and pricing](https://skim402.com/pricing): free plan + paid card plans from $15/mo via Stripe
 - [Wallet setup](https://skim402.com/wallet): how to set up a Base wallet for per-call x402 payments
 - [The Skim Audit](https://skim402.com/audit): free agent-spend analysis — email a usage-dashboard screenshot, get an executive savings estimate

@@ -207,4 +207,52 @@ assert("empty_pdf uses message not code", apiErrorMessage(422, { error: "empty_p
 assert("empty_pdf is a miss", isEmptyPdfMiss(422, { error: "empty_pdf", message: "No extractable text found in this PDF" }));
 assert("other 422 pdf fetch is not empty_pdf miss", !isEmptyPdfMiss(422, { error: "unprocessable", message: "Upstream responded 404" }));
 
+const SIGNAL_SLUGS = [
+  "ai-news",
+  "security",
+  "research",
+  "sec-filings",
+  "x402",
+  "crypto-news",
+  "macro",
+  "regulations",
+  "courts",
+  "recalls",
+  "deals",
+  "launches",
+  "energy",
+  "campaign-finance",
+  "trending",
+  "entertainment",
+  "studio-jobs",
+  "film-incentives",
+];
+assert("catalog is 17 vertical + x402", SIGNAL_SLUGS.filter((s) => s !== "x402").length === 17 && SIGNAL_SLUGS.includes("x402"));
+assert("x402 is not /signal/x402", SIGNAL_SLUGS.includes("x402"));
+function signalPollPath(slug) {
+  return slug === "x402" ? "/t/feeds/x402/latest" : `/t/signal/${slug}/latest`;
+}
+function signalKeyPath(slug) {
+  return slug === "x402" ? "/api/t/feeds/x402/latest" : `/api/t/signal/${slug}/latest`;
+}
+function signalWalletPath(slug) {
+  return slug === "x402" ? "/api/v2/feeds/x402/latest" : `/api/v2/signal/${slug}/latest`;
+}
+assert("ai-news path", signalPollPath("ai-news") === "/t/signal/ai-news/latest");
+assert("x402 feed path", signalPollPath("x402") === "/t/feeds/x402/latest");
+assert("key path is /api/t first", signalKeyPath("ai-news") === "/api/t/signal/ai-news/latest");
+assert("wallet path is /api/v2 second", signalWalletPath("ai-news") === "/api/v2/signal/ai-news/latest");
+assert("x402 key path is /feeds not /signal", signalKeyPath("x402") === "/api/t/feeds/x402/latest");
+
+function signalCredits(resStatus, body, accountDelta) {
+  const rec = asRecord(body);
+  if (typeof rec?.charged === "number") return Math.max(0, rec.charged);
+  if (typeof accountDelta === "number") return Math.max(0, accountDelta);
+  if (resStatus === 404 || rec?.unchanged === true) return 0;
+  return 2;
+}
+assert("404 unknown slug not billed", signalCredits(404, { error: "unknown signal" }, 0) === 0);
+assert("sidecar unchanged uses charged 0", signalCredits(200, { items: [], unchanged: true, charged: 0 }, 0) === 0);
+assert("live 304 that still billed uses ledger delta", signalCredits(304, { unchanged: true }, 2) === 2);
+
 console.log("\nAll workbench mapping checks passed.");

@@ -4,6 +4,10 @@
  *   POST /api/t/crawl
  *   POST /api/t/watch  (+ webhookUrl, PATCH update, GET /diff fires webhook)
  *   POST /api/t/read-pdf
+ *   GET  /api/signals + /signals.json  (unauthenticated machine catalog)
+ *   GET  /api/t/signal/sample  (unauthenticated bazaar example, charged: 0)
+ *   GET  /api/t/signal/:slug/latest + /api/t/feeds/x402/latest
+ *        (since= / If-None-Match → 304 or unchanged + refund when host injects refundCredits)
  *
  * Extract wraps the existing LLM handler (next()) — it does not replace it
  * and does not double-mount /api/t/watch*. Pass refundCredits so an empty
@@ -21,6 +25,7 @@ import { tokenCrawlMiddleware } from "./tokenCrawl.mjs";
 import { tokenReadPdfMiddleware } from "./tokenReadPdf.mjs";
 import { tokenWatchHooksMiddleware } from "./tokenWatchHooks.mjs";
 import { tokenExtractFilterMiddleware } from "./tokenExtract.mjs";
+import { tokenSignalMiddleware } from "./tokenSignal.mjs";
 import { vitePlugin } from "./http.mjs";
 
 export function tokenProductsMiddleware(opts = {}) {
@@ -28,16 +33,30 @@ export function tokenProductsMiddleware(opts = {}) {
   const crawl = tokenCrawlMiddleware(opts);
   const pdf = tokenReadPdfMiddleware(opts);
   const watch = tokenWatchHooksMiddleware(opts);
+  const signal = tokenSignalMiddleware(opts);
   return async function tokenProducts(req, res, next) {
     const path = (req.url ?? "").split("?")[0].replace(/\/+$/, "") || "/";
     if (path === "/api/t/extract") return extract(req, res, next);
     if (path === "/api/t/crawl") return crawl(req, res, next);
     if (path === "/api/t/read-pdf") return pdf(req, res, next);
     if (path.startsWith("/api/t/watch")) return watch(req, res, next);
+    if (
+      path === "/api/signals" ||
+      path === "/signals.json" ||
+      path === "/api/t/signal/sample" ||
+      path === "/api/t/signals/sample" ||
+      path === "/api/t/feeds/x402/latest" ||
+      /^\/api\/t\/signal\/[^/]+\/latest$/.test(path)
+    ) {
+      return signal(req, res, next);
+    }
     next();
   };
 }
 
 export function tokenProductsVitePlugin(opts = {}) {
-  return vitePlugin("skim-token-products", tokenProductsMiddleware(opts));
+  return vitePlugin(
+    "skim-token-products",
+    tokenProductsMiddleware({ ...opts, proxySignals: true }),
+  );
 }

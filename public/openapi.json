@@ -3,12 +3,17 @@
   "info": {
     "title": "Skim",
     "version": "1.0.0",
-    "description": "Skim \u2014 clean web reader for AI agents. Turns any URL into agent-ready Markdown (no nav, no ads, no boilerplate) plus structured metadata, in milliseconds \u2014 ~4x smaller than raw HTML, so agents pay for ~4x fewer input tokens. Default path: free API key (sk402_, 1,000 credits, no wallet) on /api/t/* endpoints. Optional path: pay per call in USDC via x402.",
+    "description": "Skim is a clean URL-to-markdown reader for agents. Turns any URL into agent-ready Markdown (no nav, no ads, no boilerplate) plus structured metadata, in milliseconds \u2014 ~4x smaller than raw HTML, so agents pay for ~4x fewer input tokens. Default path: card API key (sk402_, 1,000 credits, no wallet) on /api/t/* endpoints. Optional path: pay per call in USDC on Base via x402.",
     "x-guidance": "Recommended: create a free sk402_ API key at https://skim402.com and call GET /api/t/read with Authorization: Bearer sk402_\u2026. Token-gated endpoints live under /api/t/*. Optional x402 path: Skim also exposes GET /api/v2/read (single URL \u2192 markdown), GET /api/v2/read/js (JS-rendered pages), POST /api/v2/read/batch (up to 10 URLs in one paid call), POST /api/v2/extract (URL + JSON Schema \u2192 schema-conforming JSON via LLM). Those endpoints return 402 Payment Required with x402 v2 payment details; sign the EIP-3009 USDC authorization with any x402 v2 client, retry, and you get the result. Pricing: $0.002 basic read, $0.005 JS render, $0.02 batch (10\u00d7 single), $0.015 structured extract \u2014 all settled in USDC on Base mainnet on the wallet path. Settlement happens only on 2xx responses, so failed reads are never charged. Identical v1 POST endpoints remain available for legacy clients at /api/v1/*.",
     "contact": {
       "name": "Skim",
       "url": "https://skim402.com"
     }
+  },
+  "x-discovery": {
+    "ownershipProofs": [
+      "0x63AE98f3363B346a94Fcc1CBcB621F1C2B1Fcddc"
+    ]
   },
   "servers": [
     {

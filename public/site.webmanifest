@@ -1,7 +1,7 @@
 {
-  "name": "Skim — Web reads and Signals for AI agents",
+  "name": "Skim — a clean URL-to-markdown reader for agents",
   "short_name": "Skim",
-  "description": "Clean web reads and structured intelligence feeds for AI agents. Free plan included — 1,000 credits a month. Pay by card or by crypto wallet.",
+  "description": "Skim is a clean URL-to-markdown reader for agents. Card API key (sk402_) is the default path; USDC on Base via x402 is optional.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

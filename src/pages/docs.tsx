@@ -277,7 +277,7 @@ export default function Docs() {
   useDocumentMeta({
     title: "Docs — reads, Signals, crawl, PDF, and more | Skim",
     description:
-      "Complete Skim API docs: reads, crawl, PDF-to-markdown, watch webhooks, extraction, tables, datasets, and Signals. Pay with a card-plan API key or per-call in USDC over x402.",
+      "Skim is a clean URL-to-markdown reader for agents. Docs for reads, crawl, PDF, watch, extraction, and Signals. Card API key (sk402_) is the default path; USDC on Base via x402 is optional.",
     canonical: "https://skim402.com/docs",
   });
 
@@ -311,8 +311,9 @@ export default function Docs() {
                 Skim API documentation
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                Turn any URL into clean, agent-ready markdown with one HTTP
-                request. Two ways to authenticate and pay.
+                Skim is a clean URL-to-markdown reader for agents. The card API
+                key (<code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">sk402_</code>) is the default path;
+                USDC on Base via x402 is optional.
               </p>
             </div>
 

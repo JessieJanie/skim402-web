@@ -1,6 +1,6 @@
 # Skim
 
-> Skim gives AI agents clean web reads and structured intelligence feeds. Send a URL, get back agent-ready Markdown plus structured metadata (title, byline, published date, language, excerpt). Start with a free API key (1,000 credits, no wallet). Pay by card on a monthly plan, or optionally per-call in USDC over HTTP 402 (x402) on Base.
+> Skim is a clean URL-to-markdown reader for agents. Send a URL, get back agent-ready Markdown plus structured metadata (title, byline, published date, language, excerpt). The card API key (sk402_) is the default path (1,000 credits, no wallet). USDC on Base via x402 is optional.
 
 ## How to pay
 
@@ -43,7 +43,8 @@
 ## Docs and resources
 
 - [Developer docs](https://skim402.com/docs): request/response shapes, payment flow, code samples in curl, JavaScript, and Python
-- [OpenAPI spec](https://skim402.com/openapi.json): machine-readable API contract for core read/extract endpoints
+- [OpenAPI spec](https://skim402.com/openapi.json): machine-readable API contract for core read/extract endpoints (card-lane /api/t/* vs wallet-lane /api/v2/*)
+- [x402 discovery](https://skim402.com/.well-known/x402): paid v2 routes for x402scan (same JSON at /.well-known/x402.json)
 - [Signals catalog](https://skim402.com/signals): 17 vertical /signal/{slug} feeds plus the x402 ecosystem feed; machine JSON at /api/signals and /signals.json
 - [Request a custom Signal](https://skim402.com/signals/request): form → hello@skim402.com
 - [Plans and pricing](https://skim402.com/pricing): free plan + paid card plans from $15/mo via Stripe

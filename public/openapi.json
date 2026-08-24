@@ -549,6 +549,61 @@
         }
       }
     },
+    "/api/t/signal/sample": {
+      "get": {
+        "operationId": "tokenSignalSample",
+        "summary": "Unauthenticated sample Signal item",
+        "description": "Returns one dated AI Tech item so clients can see the JSON shape. Clearly labeled sample. Never billed (charged: 0). Does not debit the sk402_ ledger.",
+        "tags": ["card"],
+        "responses": {
+          "200": { "description": "Sample envelope with items[0] and charged: 0" }
+        }
+      }
+    },
+    "/api/t/signal/{slug}/latest": {
+      "get": {
+        "operationId": "tokenSignalLatest",
+        "summary": "Poll a Signal (card-lane token auth)",
+        "description": "2 credits per successful poll. Failed polls (unknown slug) are not charged. Optional since= or If-None-Match: when this repo's sidecar is mounted with refundCredits, an unchanged feed returns 304 or { items: [], unchanged: true, charged: 0 }. Live Express already emits 304 for matching ETags but still bills unless that sidecar refunds.",
+        "tags": ["card"],
+        "security": [{ "skimToken": [] }],
+        "parameters": [
+          { "name": "slug", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Live catalog slug such as ai-news. x402 uses GET /api/t/feeds/x402/latest instead." },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } },
+          { "name": "since", "in": "query", "schema": { "type": "string", "format": "date-time" }, "description": "ISO timestamp; unchanged asOf → charged 0 when sidecar refunds" },
+          { "name": "forms", "in": "query", "schema": { "type": "string" } },
+          { "name": "fields", "in": "query", "schema": { "type": "string" } },
+          { "name": "categories", "in": "query", "schema": { "type": "string" } },
+          { "name": "states", "in": "query", "schema": { "type": "string" } },
+          { "name": "committees", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Feed envelope or unchanged: true" },
+          "304": { "description": "If-None-Match matched; charged 0 when sidecar refunds" },
+          "401": { "description": "Missing or unknown token" },
+          "402": { "description": "Out of credits" },
+          "404": { "description": "Unknown signal" }
+        }
+      }
+    },
+    "/api/t/feeds/x402/latest": {
+      "get": {
+        "operationId": "tokenX402FeedLatest",
+        "summary": "Poll the x402 ecosystem feed (card-lane token auth)",
+        "description": "2 credits. Same honesty rules as GET /api/t/signal/{slug}/latest. Not a /signal/x402 slug.",
+        "tags": ["card"],
+        "security": [{ "skimToken": [] }],
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } },
+          { "name": "since", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+        ],
+        "responses": {
+          "200": { "description": "Feed envelope" },
+          "304": { "description": "Unchanged" },
+          "401": { "description": "Missing or unknown token" }
+        }
+      }
+    },
     "/api/t/read-pdf": {
       "post": {
         "operationId": "tokenReadPdf",

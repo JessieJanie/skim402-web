@@ -5,12 +5,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { fetchAccountCredits } from "@/lib/accountCredits";
+import { SIGNAL_CATALOG, signalPollPath, type SignalFilterKey } from "@/lib/signals";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
 const SESSION_KEY_STORAGE = "skim-workbench-trial-key";
 const WATCH_STORAGE = "skim-workbench-watch";
 
-type WorkbenchMode = "read" | "batch" | "extract" | "crawl" | "pdf" | "watch";
+type WorkbenchMode = "read" | "batch" | "extract" | "crawl" | "pdf" | "watch" | "signal";
 
 const MODES: { id: WorkbenchMode; label: string; hint: string; cost: string }[] = [
   {
@@ -48,6 +49,12 @@ const MODES: { id: WorkbenchMode; label: string; hint: string; cost: string }[] 
     label: "Watch a page",
     hint: "Register URL(s), then check whether the content changed. Optional HTTPS webhook.",
     cost: "1 credit per successful fetch. Status is free.",
+  },
+  {
+    id: "signal",
+    label: "Poll a Signal",
+    hint: "Pick a live catalog slug and poll the structured feed.",
+    cost: "2 credits per successful poll. Failed polls are not charged.",
   },
 ];
 
@@ -200,6 +207,38 @@ type WatchCheckResult = {
   jsonRaw: unknown;
   credits: number;
   ms: number;
+};
+
+type SignalFeedItem = {
+  title?: string;
+  source?: string;
+  at?: string;
+  url?: string;
+  summary?: string;
+  kind?: string;
+};
+
+type SignalResult = {
+  slug: string;
+  path: string;
+  limit: number;
+  filters: Partial<Record<SignalFilterKey, string>>;
+  items: SignalFeedItem[];
+  unchanged?: boolean;
+  feed?: string;
+  asOf?: string;
+  jsonRaw: unknown;
+  credits: number;
+  ms: number;
+  status: number;
+};
+
+const SIGNAL_FILTER_HINTS: Record<SignalFilterKey, string> = {
+  forms: "e.g. 8-K,S-1",
+  categories: "e.g. laptop,gpu",
+  fields: "e.g. ai,nlp",
+  states: "e.g. CA,GA",
+  committees: "e.g. dnc",
 };
 
 function isValidUrl(s: string) {
@@ -628,7 +667,7 @@ export default function Playground() {
   useDocumentMeta({
     title: "Reader Workbench | Skim",
     description:
-      "Try Skim in the browser: one page, several pages, extract a table, crawl a site, read a PDF, or watch a page for changes. Uses the same free trial key as a single read.",
+      "Try Skim in the browser: one page, several pages, extract a table, crawl a site, read a PDF, watch a page, or poll a Signal. Uses the same free trial key as a single read.",
     canonical: "https://skim402.com/playground",
   });
 
@@ -683,7 +722,15 @@ export default function Playground() {
   const [pdfError, setPdfError] = useState("");
   const [pdfResult, setPdfResult] = useState<PdfResult | null>(null);
 
-  const busy = isReading || isBatching || isExtracting || isRegisteringWatch || isCheckingWatch || isCrawling || isReadingPdf;
+  const [signalSlug, setSignalSlug] = useState("ai-news");
+  const [signalLimit, setSignalLimit] = useState("20");
+  const [signalFilters, setSignalFilters] = useState<Partial<Record<SignalFilterKey, string>>>({});
+  const [isPollingSignal, setIsPollingSignal] = useState(false);
+  const [signalError, setSignalError] = useState("");
+  const [signalResult, setSignalResult] = useState<SignalResult | null>(null);
+
+  const busy = isReading || isBatching || isExtracting || isRegisteringWatch || isCheckingWatch || isCrawling || isReadingPdf || isPollingSignal;
+  const activeSignal = SIGNAL_CATALOG.find((item) => item.slug === signalSlug) ?? SIGNAL_CATALOG[0];
 
   useEffect(() => {
     let cancelled = false;
@@ -731,6 +778,7 @@ export default function Playground() {
       else if (raw === "crawl" || raw === "site") setMode("crawl");
       else if (raw === "pdf" || raw === "read-pdf") setMode("pdf");
       else if (raw === "watch") setMode("watch");
+      else if (raw === "signal" || raw === "signals") setMode("signal");
       else if (raw === "read" || raw === "one") setMode("read");
     } catch {
       // Ignore malformed URLs; default mode is one page.
@@ -1233,6 +1281,90 @@ export default function Playground() {
     }
   };
 
+  const runSignal = async () => {
+    if (!key || isPollingSignal) return;
+    const entry = SIGNAL_CATALOG.find((item) => item.slug === signalSlug);
+    if (!entry) {
+      setSignalError("Pick a Signal from the live catalog.");
+      return;
+    }
+    const limit = Math.min(100, Math.max(1, Number(signalLimit) || 20));
+    const params = new URLSearchParams({ limit: String(limit) });
+    const filters: Partial<Record<SignalFilterKey, string>> = {};
+    for (const name of entry.filters) {
+      const value = signalFilters[name]?.trim();
+      if (value) {
+        params.set(name, value);
+        filters[name] = value;
+      }
+    }
+    const path = signalPollPath(entry.slug);
+    setIsPollingSignal(true);
+    setSignalError("");
+    setSignalResult(null);
+    const startTime = Date.now();
+    const creditsBefore = key.credits;
+    try {
+      const res = await fetch(`${API_BASE}${path}?${params}`, {
+        headers: { Authorization: `Bearer ${key.token}` },
+      });
+      const ms = Date.now() - startTime;
+      const body = res.status === 304 ? { unchanged: true, items: [] } : await res.json().catch(() => null);
+      if (res.status === 404) {
+        setSignalError(apiErrorMessage(res.status, body, "Unknown Signal slug."));
+        clearKeyOn401(res.status);
+        await settleCredits(key.token, 0);
+        return;
+      }
+      if (!res.ok && res.status !== 304) {
+        setSignalError(apiErrorMessage(res.status, body, "Signal poll failed."));
+        clearKeyOn401(res.status);
+        await settleCredits(key.token, 0);
+        return;
+      }
+      const rec = asRecord(body);
+      const items = (Array.isArray(rec?.items) ? rec.items : [])
+        .map((row) => {
+          const item = asRecord(row);
+          if (!item) return null;
+          return {
+            title: typeof item.title === "string" ? item.title : undefined,
+            source: typeof item.source === "string" ? item.source : undefined,
+            at: typeof item.at === "string" ? item.at : undefined,
+            url: typeof item.url === "string" ? item.url : undefined,
+            summary: typeof item.summary === "string" ? item.summary : undefined,
+            kind: typeof item.kind === "string" ? item.kind : undefined,
+          } satisfies SignalFeedItem;
+        })
+        .filter((item): item is SignalFeedItem => item !== null);
+      const unchanged = res.status === 304 || rec?.unchanged === true;
+      const live = await fetchAccountCredits(API_BASE, key.token);
+      if (live != null) persistKey({ token: key.token, credits: live });
+      const explicit = explicitCreditsFromResponse(res, body);
+      const credits =
+        explicit ??
+        (live != null ? Math.max(0, creditsBefore - live) : unchanged || !res.ok ? 0 : 2);
+      setSignalResult({
+        slug: entry.slug,
+        path,
+        limit,
+        filters,
+        items,
+        unchanged,
+        feed: typeof rec?.feed === "string" ? rec.feed : entry.slug,
+        asOf: typeof rec?.asOf === "string" ? rec.asOf : undefined,
+        jsonRaw: body,
+        credits,
+        ms,
+        status: res.status,
+      });
+    } catch {
+      setSignalError("Network error. Could not reach the Signal API.");
+    } finally {
+      setIsPollingSignal(false);
+    }
+  };
+
   const copyMarkdown = () => {
     if (!currentResult) return;
     void navigator.clipboard.writeText(currentResult.markdown).then(() => {
@@ -1268,7 +1400,7 @@ export default function Playground() {
             Reader Workbench
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl">
-            Try the same free API key on one page, several pages, a table extract, a site crawl, a PDF, or a page watch — no curl required.
+            Try the same free API key on one page, several pages, a table extract, a site crawl, a PDF, a page watch, or a Signal poll — no curl required.
           </p>
         </div>
 
@@ -1739,6 +1871,88 @@ export default function Playground() {
                 )}
               </div>
               )}
+
+              {mode === "signal" && (
+              <form
+                className="space-y-5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void runSignal();
+                }}
+              >
+                <div>
+                  <label htmlFor="workbench-signal-slug" className="text-sm font-medium text-foreground/80">
+                    Signal
+                  </label>
+                  <select
+                    id="workbench-signal-slug"
+                    value={signalSlug}
+                    onChange={(e) => {
+                      setSignalSlug(e.target.value);
+                      setSignalFilters({});
+                    }}
+                    data-testid="select-signal-slug"
+                    className="mt-2 w-full bg-background border border-border/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#236CFF]/40 focus:border-[#236CFF] transition-all"
+                    disabled={isPollingSignal}
+                  >
+                    {SIGNAL_CATALOG.map((item) => (
+                      <option key={item.slug} value={item.slug}>
+                        {item.name} ({item.slug})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-xs text-muted-foreground font-mono">
+                    GET /api{signalPollPath(activeSignal.slug)}
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="workbench-signal-limit" className="text-sm font-medium text-foreground/80">
+                    Limit (1–100)
+                  </label>
+                  <input
+                    id="workbench-signal-limit"
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={signalLimit}
+                    onChange={(e) => setSignalLimit(e.target.value)}
+                    data-testid="input-signal-limit"
+                    className="mt-2 w-full bg-background border border-border/80 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#236CFF]/40 focus:border-[#236CFF] transition-all"
+                    disabled={isPollingSignal}
+                  />
+                </div>
+                {activeSignal.filters.map((name) => (
+                  <div key={name}>
+                    <label htmlFor={`workbench-signal-${name}`} className="text-sm font-medium text-foreground/80">
+                      {name}= <span className="font-normal text-muted-foreground">(optional)</span>
+                    </label>
+                    <input
+                      id={`workbench-signal-${name}`}
+                      type="text"
+                      value={signalFilters[name] ?? ""}
+                      onChange={(e) => setSignalFilters((prev) => ({ ...prev, [name]: e.target.value }))}
+                      data-testid={`input-signal-filter-${name}`}
+                      placeholder={SIGNAL_FILTER_HINTS[name]}
+                      className="mt-2 w-full bg-background border border-border/80 rounded-xl px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#236CFF]/40 focus:border-[#236CFF] transition-all"
+                      disabled={isPollingSignal}
+                    />
+                  </div>
+                ))}
+                <button
+                  type="submit"
+                  disabled={!key || isPollingSignal}
+                  data-testid="button-run-signal"
+                  className="w-full bg-[#236CFF] text-white font-semibold py-3 rounded-xl hover:bg-[#236CFF]/90 transition-all shadow-[0_8px_20px_rgba(35,108,255,0.2)] disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none hover:-translate-y-[1px] active:translate-y-0"
+                >
+                  {isPollingSignal ? "Polling..." : "Poll this Signal"}
+                </button>
+                {signalError && (
+                  <p className="text-[13px] text-destructive font-medium bg-destructive/10 p-3 rounded-lg border border-destructive/20 leading-relaxed">
+                    {signalError}
+                  </p>
+                )}
+              </form>
+              )}
             </div>
 
             {mode === "read" && history.length > 0 && (
@@ -2151,6 +2365,81 @@ export default function Playground() {
                      </Tabs>
                    </div>
                  </div>
+               ) : mode === "signal" && signalResult ? (
+                 <div className="flex flex-col h-full">
+                   <div className="px-6 py-4 border-b border-border/50 flex flex-wrap items-center justify-between gap-4 bg-muted/20">
+                     <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Signal receipt</h2>
+                     <div className="flex items-center gap-4 text-[13px] font-mono font-medium" data-testid="status-signal-receipt">
+                       <span className="text-foreground/70">{signalResult.ms} ms</span>
+                       <span className="text-foreground/70">
+                         {signalResult.unchanged ? "Unchanged" : `${signalResult.items.length} item${signalResult.items.length === 1 ? "" : "s"}`}
+                       </span>
+                       <span className="bg-[#fde68a] text-[#5a4500] px-2 py-0.5 rounded-md">
+                         {signalResult.credits === 0 ? "Not charged" : creditLabel(signalResult.credits)}
+                       </span>
+                     </div>
+                   </div>
+                   <div className="flex-1 overflow-hidden flex flex-col bg-background">
+                     <Tabs defaultValue="items" className="w-full h-full flex flex-col">
+                       <div className="px-6 pt-2 border-b border-border/50 bg-muted/10">
+                         <TabsList className="bg-transparent h-12">
+                           <TabsTrigger value="items" data-testid="tab-signal-items" className="data-[state=active]:bg-background data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#236CFF] rounded-none px-4 h-full">
+                             Items
+                           </TabsTrigger>
+                           <TabsTrigger value="json" data-testid="tab-signal-json" className="data-[state=active]:bg-background data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#236CFF] rounded-none px-4 h-full">
+                             Raw JSON
+                           </TabsTrigger>
+                           <TabsTrigger value="code" className="data-[state=active]:bg-background data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-[#236CFF] rounded-none px-4 h-full">
+                             Integration
+                           </TabsTrigger>
+                         </TabsList>
+                       </div>
+                       <TabsContent value="items" className="flex-1 p-6 overflow-auto m-0 outline-none space-y-4">
+                         {signalResult.unchanged ? (
+                           <p className="text-sm text-muted-foreground" data-testid="status-signal-unchanged">
+                             Feed unchanged since your last cursor. Receipt uses the ledger, not a guessed 0.
+                           </p>
+                         ) : signalResult.items.length === 0 ? (
+                           <p className="text-sm text-muted-foreground">No items in this poll.</p>
+                         ) : (
+                           signalResult.items.map((item, index) => (
+                             <div key={`${item.url ?? item.title ?? "item"}-${index}`} className="rounded-xl border border-border/50 p-4">
+                               <p className="text-sm font-medium">{item.title || "Untitled item"}</p>
+                               <p className="text-xs text-muted-foreground mt-1">
+                                 {[item.source, item.at, item.kind].filter(Boolean).join(" · ")}
+                               </p>
+                               {item.summary && (
+                                 <p className="text-[13px] text-foreground/80 mt-2">{item.summary}</p>
+                               )}
+                               {item.url && (
+                                 <a href={item.url} target="_blank" rel="noopener" className="text-xs text-[#236CFF] hover:underline break-all mt-2 inline-block">
+                                   {item.url}
+                                 </a>
+                               )}
+                             </div>
+                           ))
+                         )}
+                       </TabsContent>
+                       <TabsContent value="json" className="flex-1 p-6 overflow-auto m-0 outline-none">
+                         <pre className="text-[12px] leading-relaxed font-mono whitespace-pre-wrap text-foreground/80">
+                           {JSON.stringify(signalResult.jsonRaw, null, 2)}
+                         </pre>
+                       </TabsContent>
+                       <TabsContent value="code" className="flex-1 p-6 overflow-auto m-0 outline-none">
+                         <CodeSnippet
+                           title="cURL"
+                           code={`curl "https://skim402.com/api${signalResult.path}?${(() => {
+                             const params = new URLSearchParams({ limit: String(signalResult.limit) });
+                             for (const [name, value] of Object.entries(signalResult.filters)) {
+                               if (value) params.set(name, value);
+                             }
+                             return params.toString();
+                           })()}" \\\n  -H "Authorization: Bearer ${token}"`}
+                         />
+                       </TabsContent>
+                     </Tabs>
+                   </div>
+                 </div>
                ) : mode === "watch" && (watchResult || watchSession) ? (
                  <div className="flex flex-col h-full">
                    <div className="px-6 py-4 border-b border-border/50 flex flex-wrap items-center justify-between gap-4 bg-muted/20">
@@ -2202,7 +2491,7 @@ export default function Playground() {
                             <div className="absolute inset-0 rounded-full border-2 border-[#236CFF]/20 border-t-[#236CFF] animate-spin" />
                          </div>
                          <p className="text-[15px] font-medium text-[#236CFF]">
-                           {mode === "extract" ? "Extracting the table..." : mode === "crawl" ? "Crawling the site..." : mode === "pdf" ? "Reading the PDF..." : mode === "watch" ? "Talking to Watch..." : "Skimming the web..."}
+                           {mode === "extract" ? "Extracting the table..." : mode === "crawl" ? "Crawling the site..." : mode === "pdf" ? "Reading the PDF..." : mode === "watch" ? "Talking to Watch..." : mode === "signal" ? "Polling the Signal..." : "Skimming the web..."}
                          </p>
                        </div>
                     ) : (
@@ -2212,7 +2501,7 @@ export default function Playground() {
                          </div>
                          <p className="text-[15px] font-medium text-foreground/80 mb-2">Workbench is empty</p>
                          <p className="text-[13px] leading-relaxed">
-                           Create a trial key, pick a mode above, and run a request to see markdown, crawled pages, a PDF, or changed/unchanged results here.
+                           Create a trial key, pick a mode above, and run a request to see markdown, crawled pages, a PDF, a Signal, or changed/unchanged results here.
                          </p>
                        </div>
                     )}

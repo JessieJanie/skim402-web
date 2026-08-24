@@ -54,10 +54,10 @@ const routes = [
     lastmod: "2026-08-23",
     title: "Reader Workbench | Skim",
     description:
-      "Try Skim in the browser: one page, several pages, extract a table, crawl a site, read a PDF, or watch a page for changes. Uses the same free trial key as a single read.",
+      "Try Skim in the browser: one page, several pages, extract a table, crawl a site, read a PDF, watch a page, or poll a Signal. Uses the same free trial key as a single read.",
     ogTitle: "Reader Workbench | Skim",
     ogDescription:
-      "Try one page, several pages, extract, crawl, PDF, or watch — no curl required.",
+      "Try one page, several pages, extract, crawl, PDF, watch, or a Signal — no curl required.",
   },
   {
     // Alias of /playground so /workbench and /workbench/ are the Workbench, not a 404.
@@ -66,10 +66,10 @@ const routes = [
     noSitemap: true,
     title: "Reader Workbench | Skim",
     description:
-      "Try Skim in the browser: one page, several pages, extract a table, crawl a site, read a PDF, or watch a page for changes. Uses the same free trial key as a single read.",
+      "Try Skim in the browser: one page, several pages, extract a table, crawl a site, read a PDF, watch a page, or poll a Signal. Uses the same free trial key as a single read.",
     ogTitle: "Reader Workbench | Skim",
     ogDescription:
-      "Try one page, several pages, extract, crawl, PDF, or watch — no curl required.",
+      "Try one page, several pages, extract, crawl, PDF, watch, or a Signal — no curl required.",
   },
   {
     path: "/pricing",
@@ -130,7 +130,7 @@ const routes = [
   {
     path: "/docs",
     outFile: "docs/index.html",
-    lastmod: "2026-08-23",
+    lastmod: "2026-08-24",
     title: "Docs — reads, Signals, crawl, PDF, and more | Skim",
     description:
       "Complete Skim API docs: reads, crawl, PDF-to-markdown, watch webhooks, extraction, tables, datasets, Signals, and Skim Watch. Pay with a card-plan API key or per-call in USDC over x402. Quickstart in curl, JavaScript, and Python.",
@@ -141,13 +141,24 @@ const routes = [
   {
     path: "/signals",
     outFile: "signals/index.html",
-    lastmod: "2026-08-17",
-    title: "Signals — 18 intelligence feeds for AI agents | Skim",
+    lastmod: "2026-08-24",
+    title: "Signals — intelligence feeds for AI agents | Skim",
     description:
-      "Eighteen structured intelligence feeds for AI agents: AI/tech news, SEC filings, crypto headlines, macro policy, security advisories, federal regulations, court opinions, product recalls, deals, launches, research papers, energy, entertainment trades, studio jobs, campaign finance, film incentives, and trending searches. Poll with a plan key (2 credits) or per-poll by wallet ($0.005).",
-    ogTitle: "Skim Signals — 18 intelligence feeds for agents",
+      "Skim Signals: structured intelligence feeds for AI agents. Poll with a free sk402_ API key (2 credits per poll). Wallet pay is optional. Eighteen live feeds — try one in the Workbench.",
+    ogTitle: "Skim Signals — intelligence feeds for agents",
     ogDescription:
-      "Eighteen vertical feeds an agent can poll with its plan API key or per-poll by crypto wallet — markets, regulators, courts, news, and more.",
+      "Poll AI, security, research, and SEC feeds with a free sk402_ key. Wallet pay is optional.",
+  },
+  {
+    path: "/signals/request",
+    outFile: "signals/request/index.html",
+    lastmod: "2026-08-24",
+    title: "Request a custom Signal | Skim",
+    description:
+      "Ask Skim to build a custom intelligence feed for your agent. We aim to reply within two business days — same as the contact page.",
+    ogTitle: "Request a custom Signal | Skim",
+    ogDescription:
+      "Tell us the vertical and example sources. Email goes to hello@skim402.com. We aim to reply within two business days.",
   },
   {
     path: "/contact",
@@ -418,6 +429,7 @@ function sitemapMeta(path) {
   if (path === "/") return { changefreq: "weekly", priority: "1.0" };
   if (["/pricing", "/docs", "/signals", "/wallet"].includes(path))
     return { changefreq: "weekly", priority: "0.9" };
+  if (path === "/signals/request") return { changefreq: "monthly", priority: "0.7" };
   if (["/faq", "/audit"].includes(path))
     return { changefreq: "monthly", priority: "0.85" };
   if (path.startsWith("/articles"))

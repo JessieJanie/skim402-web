@@ -2027,6 +2027,20 @@ const feed = await res.json();`}
               <a href="/signals" className="text-primary hover:underline">
                 Signals page
               </a>
+              . Try a poll with a free trial key in the{" "}
+              <Link href="/playground?mode=signal" className="text-primary hover:underline">
+                Workbench — Poll a Signal
+              </Link>
+              .
+            </P>
+            <P>
+              See the JSON shape without spending credits:{" "}
+              <InlineCode>GET /api/t/signal/sample</InlineCode> is
+              unauthenticated, returns one dated AI Tech item, and is never
+              billed. Request a missing vertical at{" "}
+              <Link href="/signals/request" className="text-primary hover:underline">
+                /signals/request
+              </Link>
               .
             </P>
             <P>
@@ -2040,6 +2054,23 @@ const feed = await res.json();`}
               <Field name="limit" type="integer">
                 Maximum number of items to return. Default 50, capped at
                 100. Items are newest-first.
+              </Field>
+              <Field name="since" type="ISO timestamp">
+                Optional. When the Signals sidecar is mounted with the card
+                ledger&apos;s refund hook, an unchanged feed (
+                <InlineCode>asOf</InlineCode> at or before{" "}
+                <InlineCode>since</InlineCode>) returns{" "}
+                <InlineCode>{`{ items: [], unchanged: true, charged: 0 }`}</InlineCode>
+                . Live Express today ignores <InlineCode>since=</InlineCode>{" "}
+                and still bills 2 credits unless that sidecar is mounted.
+              </Field>
+              <Field name="If-None-Match" type="header">
+                Optional. Express already answers <InlineCode>304</InlineCode>{" "}
+                when the body ETag matches — but that poll is still billed.
+                With the sidecar refund hook, an unchanged{" "}
+                <InlineCode>If-None-Match</InlineCode> is{" "}
+                <InlineCode>304</InlineCode> and{" "}
+                <InlineCode>charged: 0</InlineCode>.
               </Field>
             </div>
             <P>
@@ -2181,7 +2212,7 @@ const feed = await res.json();`}
               <Link href="/pricing" className="text-primary hover:underline">
                 card plan
               </Link>
-              . Try read, batch, extract, crawl, PDF, and watch in the{" "}
+              .               Try read, batch, extract, crawl, PDF, watch, and Signals in the{" "}
               <Link href="/playground" className="text-primary hover:underline">
                 Workbench
               </Link>{" "}
@@ -2277,6 +2308,10 @@ curl "https://skim402.com/api/t/signal/ai-news/latest?limit=25" \\
 curl "https://skim402.com/api/t/feeds/x402/latest?limit=25" \\
   -H "Authorization: Bearer sk402_YOUR_KEY"`}
               </Code>
+              <Field name="GET /t/signal/sample" type="free">
+                Unauthenticated dated AI Tech item so you can see the JSON
+                shape. <InlineCode>charged: 0</InlineCode>. Not a poll.
+              </Field>
               <Field name="GET /t/signal/:slug/latest" type="2 credits">
                 Token-gated access to any{" "}
                 <a href="#signals" className="text-primary hover:underline">
@@ -2291,8 +2326,13 @@ curl "https://skim402.com/api/t/feeds/x402/latest?limit=25" \\
                 <InlineCode>categories=</InlineCode>, and{" "}
                 <InlineCode>committees=</InlineCode>, and{" "}
                 <InlineCode>jurisdictions=</InlineCode> (where supported), as
-                well as <InlineCode>limit=</InlineCode>. Failed polls are
-                refunded.
+                well as <InlineCode>limit=</InlineCode> and{" "}
+                <InlineCode>since=</InlineCode>. Failed polls are
+                refunded. Try it in the{" "}
+                <Link href="/playground?mode=signal" className="text-primary hover:underline">
+                  Workbench
+                </Link>
+                .
               </Field>
               <Field name="GET /t/feeds/x402/latest" type="2 credits">
                 Token-gated access to the{" "}

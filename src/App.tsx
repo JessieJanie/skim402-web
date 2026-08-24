@@ -206,8 +206,8 @@ function ClerkProviderWithRoutes() {
             <Route path="/account" component={AccountRedirect} />
             <Route path="/account/" component={AccountRedirect} />
             <Route path="/docs" component={Docs} />
-            <Route path="/signals" component={Signals} />
             <Route path="/signals/request" component={SignalsRequest} />
+            <Route path="/signals" component={Signals} />
             <Route path="/contact" component={Contact} />
             <Route path="/faq" component={FAQ} />
             <Route path="/privacy" component={Privacy} />

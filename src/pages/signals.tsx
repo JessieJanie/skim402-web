@@ -103,7 +103,7 @@ export default function Signals() {
         setSample(body);
       })
       .catch(() => {
-        // Keep the dated example when the sample route is not mounted yet.
+        // Keep the bazaar example when the sample route is not mounted yet.
       });
     return () => {
       cancelled = true;

@@ -448,7 +448,7 @@ console.log("Private key:", privateKey); // save this somewhere safe`}
             <Code>
 {`# .env
 AGENT_PRIVATE_KEY=0x...          # for the API code samples above
-SKIM_WALLET_PRIVATE_KEY=0x...    # for the MCP server below`}
+SKIM_WALLET_PRIVATE_KEY=0x...    # optional MCP wallet path; default MCP uses SKIM_API_KEY=sk402_...`}
             </Code>
             <P>
               The key never leaves your machine. Your x402 client uses it
@@ -466,29 +466,32 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # for the MCP server below`}
 
             <H2 id="mcp">Use from Claude / Cursor (MCP)</H2>
             <P>
-              Don&apos;t want a wallet? Skip this section. Create a free{" "}
-              <InlineCode>sk402_</InlineCode> key on the{" "}
+              Default path: a free{" "}
+              <InlineCode>sk402_</InlineCode> API key. Create one on the{" "}
               <Link href="/" className="text-primary hover:underline">
                 homepage
               </Link>{" "}
-              (1,000 credits) and call{" "}
+              (1,000 credits, no wallet) and put it in{" "}
+              <InlineCode>SKIM_API_KEY</InlineCode>. The local{" "}
+              <InlineCode>skim-mcp</InlineCode> server calls{" "}
               <InlineCode>GET /api/t/read</InlineCode> with{" "}
-              <InlineCode>Authorization: Bearer sk402_…</InlineCode> — see{" "}
+              <InlineCode>Authorization: Bearer sk402_…</InlineCode>. You can
+              also call that endpoint directly — see{" "}
               <a href="#quickstart" className="text-primary hover:underline">
                 Quickstart
               </a>
               . The hosted remote MCP at{" "}
-              <InlineCode>https://skim402.com/api/mcp</InlineCode> also works
-              on a shared free tier with no wallet.
+              <InlineCode>https://skim402.com/api/mcp</InlineCode> works on a
+              shared free tier with no wallet.
             </P>
             <P>
-              The local <InlineCode>skim-mcp</InlineCode> server is the optional
-              x402 path. It wraps Skim&apos;s <InlineCode>/v1/read</InlineCode>{" "}
-              endpoint, signs each payment from a Base wallet, and exposes a
-              single <InlineCode>read_url</InlineCode> tool. That path still
-              uses <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> — a fresh
-              wallet with a little USDC, not your personal one. A dollar funds
-              ~500 reads.
+              Wallet pay is an optional second path. If you already hold USDC
+              on Base, <InlineCode>skim-mcp</InlineCode> will sign each x402
+              payment when you set{" "}
+              <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> instead (a fresh
+              low-balance wallet, not your personal one).{" "}
+              <InlineCode>SKIM_API_KEY</InlineCode> wins if both are set. A
+              dollar of USDC funds ~500 reads.
             </P>
 
             <H3>Remote connector (no install)</H3>
@@ -557,23 +560,41 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # for the MCP server below`}
       "command": "npx",
       "args": ["-y", "skim-mcp"],
       "env": {
-        "SKIM_WALLET_PRIVATE_KEY": "0xYOUR_BASE_WALLET_PRIVATE_KEY"
+        "SKIM_API_KEY": "sk402_YOUR_KEY"
       }
     }
   }
 }`}
             </Code>
             <P>
-              Restart Claude Desktop. You'll see a new{" "}
-              <InlineCode>read_url</InlineCode> tool. Ask Claude to read any
-              article and it'll fetch it through Skim and pay automatically.
+              Restart Claude Desktop. You'll see <InlineCode>read_url</InlineCode>{" "}
+              (and batch / extract / watch). Ask Claude to read any article —
+              it uses your key on the card lane. No wallet required.
             </P>
+            <P>
+              Optional wallet path — only if you want to pay per call in USDC
+              instead of a key:
+            </P>
+            <Code>
+{`{
+  "mcpServers": {
+    "skim": {
+      "command": "npx",
+      "args": ["-y", "skim-mcp"],
+      "env": {
+        "SKIM_WALLET_PRIVATE_KEY": "0xYOUR_BASE_WALLET_PRIVATE_KEY"
+      }
+    }
+  }
+}`}
+            </Code>
 
             <H3>Install in Cursor</H3>
             <P>
               Edit <InlineCode>~/.cursor/mcp.json</InlineCode> (or use the
-              in-app <strong>Settings → MCP</strong> panel) with the same JSON
-              block as above.
+              in-app <strong>Settings → MCP</strong> panel) with the same
+              default JSON block (<InlineCode>SKIM_API_KEY</InlineCode>) as
+              Claude Desktop. Wallet env is optional.
             </P>
 
             <H3>Install in Codex</H3>
@@ -585,34 +606,55 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # for the MCP server below`}
 {`[mcp_servers.skim]
 command = "npx"
 args = ["-y", "skim-mcp"]
-env = { "SKIM_WALLET_PRIVATE_KEY" = "0xYOUR_BASE_WALLET_PRIVATE_KEY" }`}
+env = { "SKIM_API_KEY" = "sk402_YOUR_KEY" }`}
             </Code>
             <P>
-              Restart Codex. The <InlineCode>read_url</InlineCode> tool becomes
-              available and Codex pays per read automatically through your wallet.
+              Restart Codex. The <InlineCode>read_url</InlineCode> tool uses
+              your <InlineCode>sk402_</InlineCode> key. Wallet pay is optional:
             </P>
+            <Code>
+{`[mcp_servers.skim]
+command = "npx"
+args = ["-y", "skim-mcp"]
+env = { "SKIM_WALLET_PRIVATE_KEY" = "0xYOUR_BASE_WALLET_PRIVATE_KEY" }`}
+            </Code>
 
             <H3>Install in Cline / Continue / Zed / other MCP clients</H3>
             <P>
               All MCP-compatible clients use the same shape. Run the binary as{" "}
               <InlineCode>npx -y skim-mcp</InlineCode> with{" "}
-              <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> set in the
-              environment. See your client's MCP server config docs for the
-              exact JSON location.
+              <InlineCode>SKIM_API_KEY=sk402_…</InlineCode> in the environment.
+              Wallet pay is optional: set{" "}
+              <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> instead if you
+              already hold USDC on Base. See your client's MCP server config
+              docs for the exact JSON location.
             </P>
 
             <H3>Environment variables</H3>
             <div className="rounded-xl border border-border bg-card px-6">
-              <Field name="SKIM_WALLET_PRIVATE_KEY" type="string" required>
-                Hex private key for the Base wallet that pays for reads. With
-                or without <InlineCode>0x</InlineCode> prefix. Never leaves
-                your machine — only used locally to sign EIP-3009 payment
-                authorizations.
+              <Field name="SKIM_API_KEY" type="string" required>
+                Card-plan API key (<InlineCode>sk402_…</InlineCode>). Get a
+                free key on the{" "}
+                <Link href="/" className="text-primary hover:underline">
+                  homepage
+                </Link>
+                . Takes priority over{" "}
+                <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode> when both are
+                set.
+              </Field>
+              <Field name="SKIM_WALLET_PRIVATE_KEY" type="string">
+                Optional x402 path. Hex private key for the Base wallet that
+                pays for reads. With or without <InlineCode>0x</InlineCode>{" "}
+                prefix. Ignored when <InlineCode>SKIM_API_KEY</InlineCode> is
+                set. Never leaves your machine — only used locally to sign
+                EIP-3009 payment authorizations.
               </Field>
               <Field name="SKIM_MAX_PRICE_USD" type="string">
-                Maximum USD per call. Default <InlineCode>0.01</InlineCode>.
-                Caps how much the wallet will sign for in a single read. Skim
-                is currently $0.002/call, well under this.
+                Wallet lane only. Maximum USD per call. Default{" "}
+                <InlineCode>0.01</InlineCode>. Caps how much the wallet will
+                sign for in a single read. Raise this (e.g.{" "}
+                <InlineCode>0.05</InlineCode>) if wallet-lane extract/batch
+                calls are rejected.
               </Field>
               <Field name="SKIM_API_URL" type="string">
                 Override the API base URL. Default{" "}
@@ -2175,9 +2217,12 @@ const feed = await res.json();`}
                 <a href="#extract" className="text-primary hover:underline">
                   /v1/extract
                 </a>
-                . Failed extracts are refunded. An empty{" "}
-                <InlineCode>{`{ tables: [] }`}</InlineCode> is not a successful
-                extract — do not treat it as an 8-credit success.
+                . Charge 8 only when at least one usable row or object comes
+                back. Empty extracts (<InlineCode>{`{ tables: [] }`}</InlineCode>,{" "}
+                <InlineCode>{`{ rows: [] }`}</InlineCode>, and the same for
+                items/records) return <InlineCode>422</InlineCode> and are not
+                billed — if credits were already deducted they are refunded on
+                the same <InlineCode>sk402_</InlineCode> ledger.
               </Field>
               <Field name="POST /t/crawl" type="1 credit per page">
                 Body{" "}

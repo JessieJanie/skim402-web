@@ -135,6 +135,23 @@ export async function tokenRead(fetchImpl, upstream, token, url, opts = {}) {
   return { status: res.status, body, headers: res.headers };
 }
 
+/** Header so a same-host honesty wrapper can reach the existing extract handler. */
+export const EXTRACT_PASSTHROUGH_HEADER = "x-skim-extract-passthrough";
+
+export async function tokenExtract(fetchImpl, upstream, token, body, extraHeaders = {}) {
+  const res = await fetchImpl(`${upstream}/api/t/extract`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...extraHeaders,
+    },
+    body: JSON.stringify(body ?? {}),
+  });
+  const parsed = await readJsonResponse(res);
+  return { status: res.status, body: parsed, headers: res.headers };
+}
+
 export async function safeFetch(fetchImpl, rawUrl, opts = {}) {
   const maxBytes = opts.maxBytes ?? 2 * 1024 * 1024;
   const timeoutMs = opts.timeoutMs ?? FETCH_TIMEOUT_MS;

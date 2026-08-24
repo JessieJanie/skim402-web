@@ -361,7 +361,7 @@ export default function Home() {
             <div className="skim-connect-copy"><h2>Get your agent skimming now.</h2><p>Start with a free API key. Skim reads the web so your agent doesn&apos;t have to parse HTML.</p></div>
           </div>
           <p className="skim-github">
-            Try one page, several pages, a table extract, or a watch in the{" "}
+            Try one page, several pages, a table extract, a crawl, a PDF, or a watch in the{" "}
             <a href="/playground" style={{color:"rgba(16,19,26,.42)"}}>Workbench</a>
             {" "}— no curl required.
           </p>

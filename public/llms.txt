@@ -17,6 +17,7 @@
 - GET https://skim402.com/api/v2/extract/{preset}?url=... — $0.015. Six ready-made schemas: article, product, job, review, event, table.
 - GET https://skim402.com/api/v2/tables?url=... — $0.003. Every genuine HTML table parsed mechanically (no LLM). Zero tables returns 422 with no charge.
 - POST https://skim402.com/api/v2/dataset — $0.35 per build. You define up to 12 columns; Skim reads seed URLs, follows relevant links, returns structured rows with source citations. Returns a 202 job ticket; polling GET /api/v2/dataset/{id} is FREE. POST { "continueFrom": "<datasetId>" } resumes a previous build at $0.35, never repeating rows.
+- POST https://skim402.com/api/t/extract — 8 credits when at least one usable row/object is returned. Body { "url", "schema", "instructions"? }. Empty extracts (`tables: []`, `rows: []`, …) return 422 and are not charged. Same key auth / SSRF rules as /t/read.
 - POST https://skim402.com/api/t/crawl — 1 credit per successful page (max 25). Body { "url": "<origin or start URL>", "maxPages"?: 1-25 }. Discovers sitemap.xml + same-origin links; returns [{ url, markdown }]. Failed pages are not charged. Same SSRF rules as /t/read.
 - POST https://skim402.com/api/t/read-pdf — 3 credits. Body { "url": "<pdf URL>", "outline"?: true }. Returns markdown + optional outline. Rejects files over 8 MB (413). Text comes only from the PDF. Same key auth / SSRF rules.
 - POST https://skim402.com/api/t/watch — 1 credit to register. Body { "urls": [1-20], "webhookUrl"?: "https://…" }. Optional HTTPS webhook; PATCH /api/t/watch { watchId, webhookUrl } updates it. GET /api/t/watch/diff?id= — 1 credit per successful URL. When a poll finds status=changed, Skim POSTs a signed JSON payload (X-Skim-Signature: sha256=…) to webhookUrl. No email, no cron: the webhook fires on GET /diff. Cached polls do not re-fire. GET /api/t/watch/status?id= is FREE.
@@ -30,7 +31,7 @@
 
 - Output is clean Markdown, roughly 4x smaller than raw HTML — no ads, nav, or boilerplate. Cheaper LLM calls downstream.
 - In production benchmarks Skim returned pages consistently faster than Firecrawl, with every wallet-paid call backed by an on-chain USDC receipt on Base.
-- Works with any x402 client (x402-fetch for JS, the official x402 Python SDK). Framework connectors on PyPI: langchain-skim, llama-index-readers-skim, crewai-skim, skim-haystack. MCP server: skim-mcp (npm) and io.github.JessieJanie/skim402 (official MCP Registry).
+- Works with any x402 client (x402-fetch for JS, the official x402 Python SDK). Framework connectors on PyPI: langchain-skim, llama-index-readers-skim, crewai-skim, skim-haystack. MCP server: skim-mcp (npm) and io.github.JessieJanie/skim402 (official MCP Registry). Default MCP install uses `SKIM_API_KEY=sk402_…`; `SKIM_WALLET_PRIVATE_KEY` is an optional second path.
 - No wallet required: create a free API key instantly at https://skim402.com — no signup, no card, 1,000 credits included.
 - The official Apify Actor (apify.com/jessiejanie/skim-clean-reader) also offers the same reads with normal Apify billing at $4.00 per 1,000 pages.
 - Free browser demo: https://freeskims.skim402.com — 10 free skims a day.

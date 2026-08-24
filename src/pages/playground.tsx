@@ -385,6 +385,20 @@ function tablesFromExtract(body: unknown): ExtractedTable[] {
   return list.map(normalizeTable).filter((table): table is ExtractedTable => table !== null);
 }
 
+/** Empty arrays are a miss (422 + charged 0). Fetch/DNS failures stay errors. */
+function isEmptyExtractMiss(status: number, body: unknown): boolean {
+  const rec = asRecord(body);
+  if (!rec) return false;
+  if (tablesFromExtract(body).length > 0) return false;
+  const err = `${typeof rec.error === "string" ? rec.error : ""} ${typeof rec.message === "string" ? rec.message : ""}`;
+  if (/resolve|hostname|fetched|timeout|blocked/i.test(err) && !/usable rows/i.test(err)) return false;
+  if (status === 200) return true;
+  if (status === 422) {
+    return rec.error === "unprocessable" || rec.charged === 0 || /usable rows/i.test(err);
+  }
+  return false;
+}
+
 function watchUrlsFromBody(body: unknown): WatchDiffUrl[] {
   const rec = asRecord(body);
   const list = Array.isArray(rec?.urls) ? rec.urls : [];
@@ -901,17 +915,27 @@ export default function Playground() {
       });
       const ms = Date.now() - startTime;
       const body = await res.json().catch(() => null);
+      const rec = asRecord(body);
+      const tables = tablesFromExtract(body);
+      if (isEmptyExtractMiss(res.status, body)) {
+        setExtractResult({
+          url: target,
+          intent,
+          tables,
+          data: rec?.data ?? body,
+          jsonRaw: body,
+          credits: 0,
+          empty: true,
+          ms,
+        });
+        return;
+      }
       if (!res.ok || !body) {
         setExtractError(apiErrorMessage(res.status, body, "Extract failed. Try a page that has a table."));
         clearKeyOn401(res.status);
         return;
       }
-      const rec = asRecord(body);
-      const tables = tablesFromExtract(body);
       const empty = tables.length === 0;
-      // Product copy: 8 credits on success; failed / empty extracts are not billed.
-      // The card-lane API currently returns 200 + { tables: [] } and still deducts 8
-      // (no refund endpoint). Workbench treats zero usable rows as a miss.
       const credits = empty ? 0 : creditsFromResponse(res, body, 8);
       debitCredits(credits);
       setExtractResult({

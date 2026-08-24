@@ -86,6 +86,19 @@ function extractCredits(tables, charged) {
   return tables.length === 0 ? 0 : (charged ?? 8);
 }
 
+function isEmptyExtractMiss(status, body) {
+  const rec = asRecord(body);
+  if (!rec) return false;
+  if (tablesFromExtract(body).length > 0) return false;
+  const err = `${typeof rec.error === "string" ? rec.error : ""} ${typeof rec.message === "string" ? rec.message : ""}`;
+  if (/resolve|hostname|fetched|timeout|blocked/i.test(err) && !/usable rows/i.test(err)) return false;
+  if (status === 200) return true;
+  if (status === 422) {
+    return rec.error === "unprocessable" || rec.charged === 0 || /usable rows/i.test(err);
+  }
+  return false;
+}
+
 function thinContentMessages(body) {
   const rec = asRecord(body);
   const warnings = Array.isArray(rec?.warnings) ? rec.warnings : [];
@@ -153,5 +166,8 @@ const tables = tablesFromExtract(emptyExtract);
 assert("empty tables is empty", tables.length === 0);
 assert("empty extract not billed as 8", extractCredits(tables, undefined) === 0);
 assert("usable extract still 8", extractCredits([{ headers: ["A"], rows: [["1"]] }], undefined) === 8);
+assert("422 empty is a miss", isEmptyExtractMiss(422, { error: "unprocessable", message: "No usable rows extracted from this page", data: { tables: [] }, charged: 0 }));
+assert("422 hostname is not a miss", !isEmptyExtractMiss(422, { error: "Could not resolve URL hostname" }));
+assert("200 empty tables is a miss", isEmptyExtractMiss(200, emptyExtract));
 
 console.log("\nAll workbench mapping checks passed.");

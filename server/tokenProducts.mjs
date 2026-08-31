@@ -9,7 +9,7 @@
  *   GET  /api/t/signal/:slug/latest + /api/t/feeds/x402/latest
  *        (since= / If-None-Match → 304 or unchanged + refund when host injects refundCredits)
  *   POST /mcp + /api/mcp   (hosted Streamable HTTP MCP; initialize/tools/list need no key)
- *   GET  /.well-known/openai-apps-challenge  (OPENAI_APPS_CHALLENGE env, optional)
+ *   GET  /.well-known/openai-apps-challenge  (env OPENAI_APPS_CHALLENGE, else committed token)
  *   GET  /.well-known/x402  +  /.well-known/x402.json  +  /.well-known/x402-service.json
  *        (x402scan discovery; same JSON. Extensionless path is what registerFromOrigin fetches.)
  *
@@ -31,10 +31,15 @@ import { tokenWatchHooksMiddleware } from "./tokenWatchHooks.mjs";
 import { tokenExtractFilterMiddleware } from "./tokenExtract.mjs";
 import { tokenSignalMiddleware } from "./tokenSignal.mjs";
 import { isDiscoveryPath, x402DiscoveryMiddleware } from "./x402Discovery.mjs";
-import { isMcpPath, isOpenaiChallengePath, mcpHttpMiddleware } from "./mcpHttp.mjs";
+import { isMcpPath, mcpHttpMiddleware } from "./mcpHttp.mjs";
+import {
+  isOpenaiChallengePath,
+  openaiAppsChallengeMiddleware,
+} from "./openaiAppsChallenge.mjs";
 import { vitePlugin } from "./http.mjs";
 
 export function tokenProductsMiddleware(opts = {}) {
+  const challenge = openaiAppsChallengeMiddleware(opts);
   const mcp = mcpHttpMiddleware(opts);
   const discovery = x402DiscoveryMiddleware();
   const extract = tokenExtractFilterMiddleware(opts);
@@ -44,7 +49,10 @@ export function tokenProductsMiddleware(opts = {}) {
   const signal = tokenSignalMiddleware(opts);
   return async function tokenProducts(req, res, next) {
     const path = (req.url ?? "").split("?")[0].replace(/\/+$/, "") || "/";
-    if (isMcpPath(path) || isOpenaiChallengePath(path)) return mcp(req, res, next);
+    // Challenge is its own route so it does not depend on the /mcp handler
+    // (live production still serves an older 3-tool stub at POST /mcp).
+    if (isOpenaiChallengePath(path)) return challenge(req, res, next);
+    if (isMcpPath(path)) return mcp(req, res, next);
     if (isDiscoveryPath(path)) return discovery(req, res, next);
     if (path === "/api/t/extract") return extract(req, res, next);
     if (path === "/api/t/crawl") return crawl(req, res, next);

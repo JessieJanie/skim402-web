@@ -33,12 +33,18 @@ import {
   vitePlugin,
 } from "./http.mjs";
 import { normalizeStartUrl } from "./tokenCrawl.mjs";
+import {
+  OPENAI_CHALLENGE_PATH,
+  isOpenaiChallengePath,
+  openaiChallengeToken,
+} from "./openaiAppsChallenge.mjs";
+
+export { OPENAI_CHALLENGE_PATH, isOpenaiChallengePath, openaiChallengeToken };
 
 export const MCP_VERSION = "1.0.0";
 export const MCP_SERVER_NAME = "skim";
 export const MCP_TIMEOUT_MS = 90_000;
 export const MCP_PATHS = ["/mcp", "/api/mcp"];
-export const OPENAI_CHALLENGE_PATH = "/.well-known/openai-apps-challenge";
 
 const SUPPORTED_PROTOCOL = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const DEFAULT_PROTOCOL = "2025-03-26";
@@ -174,16 +180,6 @@ export const SIGNAL_SLUGS = [
 export function isMcpPath(path) {
   const clean = (path ?? "").split("?")[0].replace(/\/+$/, "") || "/";
   return MCP_PATHS.includes(clean);
-}
-
-export function isOpenaiChallengePath(path) {
-  const clean = (path ?? "").split("?")[0].replace(/\/+$/, "") || "/";
-  return clean === OPENAI_CHALLENGE_PATH;
-}
-
-export function openaiChallengeToken(env = process.env) {
-  const raw = env.OPENAI_APPS_CHALLENGE ?? env.OPENAI_DOMAIN_VERIFICATION ?? "";
-  return typeof raw === "string" ? raw : "";
 }
 
 export function getMcpApiKey(headers) {
@@ -786,13 +782,10 @@ export function createMcpHandler(opts = {}) {
         return { status: 405, headers: { Allow: "GET, HEAD" }, body: { error: "method_not_allowed" } };
       }
       const token = openaiChallengeToken(env);
-      if (!token) {
-        return { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" }, body: "" };
-      }
       return {
         status: 200,
         headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
-        body: token,
+        body: `${token}\n`,
         raw: true,
       };
     }

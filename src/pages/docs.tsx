@@ -527,8 +527,10 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # optional MCP wallet path; default MCP uses SK
               key. After Scan Tools succeeds, set the header above. Optional
               domain verification:{" "}
               <InlineCode>GET /.well-known/openai-apps-challenge</InlineCode>{" "}
-              returns the <InlineCode>OPENAI_APPS_CHALLENGE</InlineCode> env
-              value once you paste OpenAI’s token.
+              returns the verification token as{" "}
+              <InlineCode>text/plain</InlineCode> (
+              <InlineCode>OPENAI_APPS_CHALLENGE</InlineCode> if set, otherwise
+              the published token).
             </P>
             <P>
               Prefer to pay by card instead of a crypto wallet? The same

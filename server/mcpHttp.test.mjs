@@ -264,15 +264,17 @@ test("read_urls, extract, crawl, pdf, watch, signal call existing /api/t routes"
   assert.deepEqual(seen, ["batch", "extract", "crawl", "pdf", "watch", "diff", "signal"]);
 });
 
-test("OpenAI apps challenge is served from env when set", async () => {
+test("OpenAI apps challenge uses committed token when env is unset", async () => {
   const empty = handler({}, {});
   const missing = await empty({ method: "GET", url: OPENAI_CHALLENGE_PATH, headers: {}, body: {} });
-  assert.equal(missing.status, 404);
+  assert.equal(missing.status, 200);
+  assert.equal(String(missing.body).trim(), "uOZcCcu1AJm20BTr-hGGVBOYqEKu4ZRyrsjCORAnwDA");
+  assert.equal(missing.raw, true);
 
   const set = handler({}, { OPENAI_APPS_CHALLENGE: "openai-challenge-token" });
   const found = await set({ method: "GET", url: OPENAI_CHALLENGE_PATH, headers: {}, body: {} });
   assert.equal(found.status, 200);
-  assert.equal(found.body, "openai-challenge-token");
+  assert.equal(String(found.body).trim(), "openai-challenge-token");
   assert.equal(found.raw, true);
 });
 

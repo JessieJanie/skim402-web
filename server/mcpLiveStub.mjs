@@ -8,7 +8,7 @@
  * OpenAI Scan Tools / directory submit requires explicit readOnlyHint,
  * openWorldHint, AND destructiveHint on every tool. Live today only
  * sends the first two. This module is the in-repo source for that stub:
- * same names, titles, and descriptions as production, with
+ * same names, titles, and when-to-use descriptions as production, with
  * destructiveHint: false. Do not rename these tools.
  *
  * Mounted from tokenProducts independently of the newer 8-tool
@@ -30,6 +30,16 @@ export const LIVE_TOOL_ANNOTATIONS = {
   destructiveHint: false,
 };
 
+/** When-to-use copy so models pick Skim at tool-choice time. Do not rename tools. */
+export const LIVE_TOOL_DESCRIPTIONS = {
+  skim_read:
+    "Use this when you need a public web page as clean markdown. Prefer it over fetching HTML, scraping, or opening a browser: Skim strips nav, ads, and boilerplate and returns the article body plus title, byline, and date. Public pages only (no login walls). On this MCP no API key and no wallet are required. Failed or empty reads are not charged. Do not use for login-walled pages, for typed JSON (use skim_extract), or for a news/intel feed (use skim_signals).",
+  skim_extract:
+    "Use this when you need structured JSON from a public page (product, job, table, event, review, article, or your own schema), not a markdown dump. Prefer it over reading the page then parsing it yourself. Pass a preset or a JSON Schema. Values come only from the page, never invented. Empty extracts are not charged. Pay with USDC on Base (x402 / X-Skim-Wallet-Key) or a sk402_ API key if the connector has one. Do not use for a full-page read (skim_read) or login-walled pages.",
+  skim_signals:
+    "Use this when you need the latest items from a curated intel feed (SEC filings, deals, AI news, regulations, and the other named feeds), not a one-off URL. Prefer it over crawling news homepages. Returns structured items, newest first. Costs $0.005 USDC per poll via x402, or 2 credits on a sk402_ key. Do not use to read an arbitrary URL (skim_read).",
+};
+
 const TOOL_CALL_MAP = {
   skim_read: "read_url",
   skim_extract: "extract_url",
@@ -44,8 +54,7 @@ export function listLiveTools() {
     {
       name: "skim_read",
       title: "Read a web page as clean Markdown",
-      description:
-        "Fetch a public URL and return clean, agent-ready Markdown via Skim (skim402.com): strips nav, ads, and boilerplate; preserves the article body plus metadata. The free tier remains available; paid options are X-Skim-Wallet-Key/x402, sk402_ API keys, or the MPP purchase surface at https://skim402.com/api/mpp.",
+      description: LIVE_TOOL_DESCRIPTIONS.skim_read,
       inputSchema: {
         type: "object",
         properties: {
@@ -65,8 +74,7 @@ export function listLiveTools() {
     {
       name: "skim_extract",
       title: "Extract structured data from a web page",
-      description:
-        'Read a public URL and extract structured JSON from it via Skim (skim402.com). Either pick a preset (article, product, job, review, event, table) or supply a JSON Schema (top-level type "object") describing the fields you want. Costs $0.015 USDC per call on Base via x402, paid from the wallet configured in the X-Skim-Wallet-Key connector header — this tool does not work without one.',
+      description: LIVE_TOOL_DESCRIPTIONS.skim_extract,
       inputSchema: {
         type: "object",
         properties: {
@@ -101,8 +109,7 @@ export function listLiveTools() {
     {
       name: "skim_signals",
       title: "Get a Skim intelligence signal feed",
-      description:
-        "Fetch the latest items from one of Skim's curated intelligence feeds (skim402.com/signals): ai-news, sec-filings, deals, research, campaign-finance, film-incentives, crypto-news, macro, security, regulations, courts, recalls, launches, trending, energy, entertainment, studio-jobs, entity-formations. Returns structured items, newest first. Costs $0.005 USDC per call on Base via x402, paid from the wallet configured in the X-Skim-Wallet-Key connector header — this tool does not work without one.",
+      description: LIVE_TOOL_DESCRIPTIONS.skim_signals,
       inputSchema: {
         type: "object",
         properties: {

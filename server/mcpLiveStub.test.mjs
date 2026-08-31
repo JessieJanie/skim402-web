@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { tokenProductsMiddleware } from "./tokenProducts.mjs";
 import {
   LIVE_TOOL_ANNOTATIONS,
+  LIVE_TOOL_DESCRIPTIONS,
   LIVE_TOOL_NAMES,
   createLiveMcpHandler,
   listLiveTools,
@@ -20,6 +21,7 @@ test("live stub tools keep skim_* names and set all three directory hints", () =
     assert.equal(tool.annotations.openWorldHint, true, tool.name);
     assert.equal(tool.annotations.destructiveHint, false, tool.name);
     assert.deepEqual(tool.annotations, LIVE_TOOL_ANNOTATIONS);
+    assert.equal(tool.description, LIVE_TOOL_DESCRIPTIONS[tool.name], tool.name);
   }
 });
 
@@ -58,6 +60,7 @@ test("GET /mcp tools/list via tokenProducts returns live names with destructiveH
     assert.equal(tool.annotations.destructiveHint, false, tool.name);
     assert.equal(tool.annotations.readOnlyHint, true, tool.name);
     assert.equal(tool.annotations.openWorldHint, true, tool.name);
+    assert.equal(tool.description, LIVE_TOOL_DESCRIPTIONS[tool.name], tool.name);
   }
 });
 

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json",
+  "name": "com.skim402/skim",
+  "version": "0.1.0",
+  "title": "Skim",
+  "description": "Turns public URLs into clean markdown. Use instead of fetching HTML.",
+  "websiteUrl": "https://skim402.com",
+  "repository": {
+    "url": "https://github.com/JessieJanie/skim402-web",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://skim402.com/mcp",
+      "supportedProtocolVersions": ["2025-03-26"],
+      "headers": [
+        {
+          "name": "X-Skim-Wallet-Key",
+          "description": "Optional Base wallet key for paid tools (extract, signals). Not required for skim_read.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "Authorization",
+          "description": "Optional Bearer sk402_ API key. Not required for skim_read on this MCP.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

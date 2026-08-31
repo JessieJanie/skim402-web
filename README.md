@@ -58,5 +58,6 @@ curl -sS -X POST https://skim402.com/mcp \
 Locally: `npm test` (includes the MCP handler) and `npm run serve`, then POST the
 same JSON to `http://localhost:5173/mcp`.
 
-Optional domain verification: `GET /.well-known/openai-apps-challenge` returns
-the value of `OPENAI_APPS_CHALLENGE` (404 until that env var is set).
+Domain verification: `GET /.well-known/openai-apps-challenge` returns
+plain text — `OPENAI_APPS_CHALLENGE` if that env var is set, otherwise the
+committed public token. No secret is required after republish.

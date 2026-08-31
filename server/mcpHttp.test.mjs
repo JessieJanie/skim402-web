@@ -264,15 +264,17 @@ test("read_urls, extract, crawl, pdf, watch, signal call existing /api/t routes"
   assert.deepEqual(seen, ["batch", "extract", "crawl", "pdf", "watch", "diff", "signal"]);
 });
 
-test("OpenAI apps challenge is served from env when set", async () => {
+test("OpenAI apps challenge uses committed token when env is unset", async () => {
   const empty = handler({}, {});
   const missing = await empty({ method: "GET", url: OPENAI_CHALLENGE_PATH, headers: {}, body: {} });
-  assert.equal(missing.status, 404);
+  assert.equal(missing.status, 200);
+  assert.equal(String(missing.body).trim(), "uOZcCcu1AJm20BTr-hGGVBOYqEKu4ZRyrsjCORAnwDA");
+  assert.equal(missing.raw, true);
 
   const set = handler({}, { OPENAI_APPS_CHALLENGE: "openai-challenge-token" });
   const found = await set({ method: "GET", url: OPENAI_CHALLENGE_PATH, headers: {}, body: {} });
   assert.equal(found.status, 200);
-  assert.equal(found.body, "openai-challenge-token");
+  assert.equal(String(found.body).trim(), "openai-challenge-token");
   assert.equal(found.raw, true);
 });
 
@@ -306,7 +308,11 @@ test("tokenProducts middleware mounts /mcp and skips /api/t/read", async () => {
   assert.equal(nextCalled, false);
   assert.equal(res.statusCode, 200);
   const payload = JSON.parse(res.body);
-  assert.equal(payload.result.tools.length, 8);
+  assert.equal(payload.result.tools.length, 3);
+  assert.deepEqual(
+    payload.result.tools.map((t) => t.name),
+    ["skim_read", "skim_extract", "skim_signals"],
+  );
 
   const skipped = { next: false };
   await middleware({ method: "GET", url: "/api/t/read", headers: {} }, { setHeader() {}, end() {} }, () => {

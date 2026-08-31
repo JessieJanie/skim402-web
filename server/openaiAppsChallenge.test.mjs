@@ -95,7 +95,11 @@ test("POST /mcp is unchanged when the challenge route is mounted", async () => {
   assert.equal(nextCalled, false);
   assert.equal(res.statusCode, 200);
   const payload = JSON.parse(res.body);
-  assert.equal(payload.result.tools.length, 8);
+  assert.equal(payload.result.tools.length, 3);
+  assert.deepEqual(
+    payload.result.tools.map((t) => t.name),
+    ["skim_read", "skim_extract", "skim_signals"],
+  );
 });
 
 test("standalone challenge middleware skips other paths and answers HEAD", async () => {

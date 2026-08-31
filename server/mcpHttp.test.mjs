@@ -308,7 +308,11 @@ test("tokenProducts middleware mounts /mcp and skips /api/t/read", async () => {
   assert.equal(nextCalled, false);
   assert.equal(res.statusCode, 200);
   const payload = JSON.parse(res.body);
-  assert.equal(payload.result.tools.length, 8);
+  assert.equal(payload.result.tools.length, 3);
+  assert.deepEqual(
+    payload.result.tools.map((t) => t.name),
+    ["skim_read", "skim_extract", "skim_signals"],
+  );
 
   const skipped = { next: false };
   await middleware({ method: "GET", url: "/api/t/read", headers: {} }, { setHeader() {}, end() {} }, () => {

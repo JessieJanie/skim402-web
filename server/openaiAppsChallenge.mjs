@@ -12,8 +12,8 @@
  * otherwise the committed public verification token. No Replit secret
  * required after republish. This token is meant to be public.
  *
- * Mount independently of POST /mcp — live production still serves the
- * older 3-tool MCP stub, and this route must not depend on replacing it.
+ * Mount independently of POST /mcp — this route must not depend on
+ * replacing the live 3-tool MCP stub.
  */
 
 import { readFileSync } from "node:fs";

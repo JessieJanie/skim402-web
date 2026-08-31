@@ -6,6 +6,7 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { tokenProductsVitePlugin } from "./server/tokenProducts.mjs";
 import { x402DiscoveryVitePlugin } from "./server/x402Discovery.mjs";
 import { openaiAppsChallengeVitePlugin } from "./server/openaiAppsChallenge.mjs";
+import { mcpLiveStubVitePlugin } from "./server/mcpLiveStub.mjs";
 
 const rawPort = process.env.PORT;
 const port = rawPort ? Number(rawPort) : 5173;
@@ -20,6 +21,7 @@ export default defineConfig({
   base: basePath,
   plugins: [
     openaiAppsChallengeVitePlugin(),
+    mcpLiveStubVitePlugin(),
     x402DiscoveryVitePlugin(),
     tokenProductsVitePlugin(),
     react(),

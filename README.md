@@ -15,3 +15,48 @@ site crawling, PDFs, page-change watches, and curated Signals.
 
 A card API key (`sk402_`) is the recommended default. Wallet/x402 payment remains
 available as an optional pay-per-call path.
+
+## Hosted MCP (OpenAI / ChatGPT)
+
+Public Streamable HTTP endpoint on this site’s API host:
+
+- **https://skim402.com/mcp** (preferred for the OpenAI plugin form)
+- `https://skim402.com/api/mcp` (same handler)
+
+`initialize` and `tools/list` work **without** an API key so OpenAI Scan Tools can
+discover tools. Actual `read_url` / `read_urls` / `extract_url` / `crawl_url` /
+`read_pdf` / `watch_urls` / `check_watch` / `poll_signal` calls require a card
+key. Do **not** set `SKIM_WALLET_PRIVATE_KEY` on the hosted server — it is never
+read or stored.
+
+**OpenAI form — API key header (after Scan Tools):**
+
+```
+Authorization: Bearer sk402_YOUR_KEY
+```
+
+or
+
+```
+x-api-key: sk402_YOUR_KEY
+```
+
+**Verify initialize + tools/list over HTTPS after deploy:**
+
+```bash
+curl -sS -X POST https://skim402.com/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"openai-scan","version":"0"}}}'
+
+curl -sS -X POST https://skim402.com/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+```
+
+Locally: `npm test` (includes the MCP handler) and `npm run serve`, then POST the
+same JSON to `http://localhost:5173/mcp`.
+
+Optional domain verification: `GET /.well-known/openai-apps-challenge` returns
+the value of `OPENAI_APPS_CHALLENGE` (404 until that env var is set).

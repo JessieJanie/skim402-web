@@ -478,8 +478,8 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # optional MCP wallet path; default MCP uses SK
                 Quickstart
               </a>
               . The hosted remote MCP at{" "}
-              <InlineCode>https://skim402.com/api/mcp</InlineCode> works on a
-              shared free tier with no wallet.
+              <InlineCode>https://skim402.com/mcp</InlineCode> uses the same
+              card key for tool calls.
             </P>
             <P>
               Wallet pay is an optional second path. If you already hold USDC
@@ -493,23 +493,42 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # optional MCP wallet path; default MCP uses SK
 
             <H3>Remote connector (no install)</H3>
             <P>
-              Skim also runs a hosted remote MCP server at{" "}
-              <InlineCode>https://skim402.com/api/mcp</InlineCode> (Streamable
-              HTTP). Add it as a custom connector in Claude — or any MCP client
-              that speaks Streamable HTTP — and you get three tools:{" "}
-              <InlineCode>skim_read</InlineCode>,{" "}
-              <InlineCode>skim_extract</InlineCode>, and{" "}
-              <InlineCode>skim_signals</InlineCode>.
+              Skim runs a hosted remote MCP server at{" "}
+              <InlineCode>https://skim402.com/mcp</InlineCode> (Streamable HTTP;
+              same handler at{" "}
+              <InlineCode>https://skim402.com/api/mcp</InlineCode>). Add it as a
+              custom connector in Claude, ChatGPT, or any client that speaks
+              Streamable HTTP. Tools match local{" "}
+              <InlineCode>skim-mcp</InlineCode>:{" "}
+              <InlineCode>read_url</InlineCode>,{" "}
+              <InlineCode>read_urls</InlineCode>,{" "}
+              <InlineCode>extract_url</InlineCode> (including tables via the{" "}
+              <InlineCode>table</InlineCode> preset),{" "}
+              <InlineCode>crawl_url</InlineCode>,{" "}
+              <InlineCode>read_pdf</InlineCode>,{" "}
+              <InlineCode>watch_urls</InlineCode>,{" "}
+              <InlineCode>check_watch</InlineCode>, and{" "}
+              <InlineCode>poll_signal</InlineCode>.
             </P>
             <P>
-              With no configuration, <InlineCode>skim_read</InlineCode> works
-              on a shared, rate-limited free tier. To unlock unmetered reads
-              plus structured extraction and signal feeds, add a request
-              header named <InlineCode>X-Skim-Wallet-Key</InlineCode> set to a
-              Base wallet private key holding a little USDC — the server signs
-              each x402 payment from your wallet, per call, and never stores
-              the key. Use a fresh, low-balance wallet dedicated to agent
-              spending, not your personal one.
+              <InlineCode>initialize</InlineCode> and{" "}
+              <InlineCode>tools/list</InlineCode> work without a key so OpenAI
+              Scan Tools can discover the catalog. Every read / extract /
+              crawl / PDF / watch / signal call requires a card API key:{" "}
+              <InlineCode>Authorization: Bearer sk402_…</InlineCode> or{" "}
+              <InlineCode>x-api-key: sk402_…</InlineCode>. The hosted server
+              never accepts or stores{" "}
+              <InlineCode>SKIM_WALLET_PRIVATE_KEY</InlineCode>.
+            </P>
+            <H3>OpenAI plugin form</H3>
+            <P>
+              MCP server URL:{" "}
+              <InlineCode>https://skim402.com/mcp</InlineCode>. Auth type: API
+              key. After Scan Tools succeeds, set the header above. Optional
+              domain verification:{" "}
+              <InlineCode>GET /.well-known/openai-apps-challenge</InlineCode>{" "}
+              returns the <InlineCode>OPENAI_APPS_CHALLENGE</InlineCode> env
+              value once you paste OpenAI’s token.
             </P>
             <P>
               Prefer to pay by card instead of a crypto wallet? The same
@@ -533,11 +552,10 @@ SKIM_WALLET_PRIVATE_KEY=0x...    # optional MCP wallet path; default MCP uses SK
               no approval step. In Grok, open{" "}
               <strong>Settings → Connectors → Add connector → Bring your own
               MCP</strong> (or the equivalent custom-connector option), paste{" "}
-              <InlineCode>https://skim402.com/api/mcp</InlineCode> as the server
-              URL, and save. <InlineCode>skim_read</InlineCode> works
-              immediately on the free tier; add the optional{" "}
-              <InlineCode>X-Skim-Wallet-Key</InlineCode> header (as above) to
-              unlock unmetered reads, extraction, and signal feeds.
+              <InlineCode>https://skim402.com/mcp</InlineCode> as the server
+              URL, and save. Scan Tools works with no key; add{" "}
+              <InlineCode>Authorization: Bearer sk402_…</InlineCode> (or{" "}
+              <InlineCode>x-api-key</InlineCode>) so tool calls can run.
             </P>
 
             <H3>Install in Claude Desktop</H3>

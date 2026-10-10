@@ -336,6 +336,12 @@ function rescueNodes(root) {
   root.querySelectorAll("details").forEach((details) => {
     if (!isInside(details, isChrome)) push(details);
   });
+  // Package search panels (NixOS) are lists of results, which readability
+  // treats as chrome and reduces to the install blurb. Keep the open
+  // result's version, license, and programs.
+  root.querySelectorAll("li.package, .package-short-details, .package-programs, .package-description").forEach((el) => {
+    if (!isInside(el, isChrome)) push(el);
+  });
   smallestFacts(root).forEach((fact) => push(fact));
   return nodes;
 }

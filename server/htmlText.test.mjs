@@ -147,6 +147,35 @@ test("prepends a title version that is not in the body", () => {
   assert.match(out.markdown, /special-key/);
 });
 
+test("keeps NixOS package version and programs readability drops", () => {
+  const html = page(`
+    <aside><label>MIT</label><label>Unlicense</label><label>AGPL-3.0-or-later</label></aside>
+    <div class="search-results-main">
+      <ul class="search-results-list">
+        <li class="package opened">
+          <a href="#show=ripgrep">ripgrep</a>
+          <div class="package-description">Utility that combines the usability of The Silver Searcher with the raw speed of grep</div>
+          <ul class="package-short-details">
+            <li>Name: <code>ripgrep</code></li>
+            <li>Version: <strong>15.2.0</strong></li>
+            <li>License: <a title="The Unlicense" href="https://spdx.org/licenses/Unlicense.html">Unlicense</a>
+              <a title="MIT License" href="https://spdx.org/licenses/MIT.html">MIT</a></li>
+          </ul>
+          <p>A nix-shell will temporarily modify your PATH environment variable. This can be used to try a piece of software before deciding to permanently install it.</p>
+          <pre>nix-shell -p ripgrep</pre>
+          <div class="package-programs"><h4>Programs provided</h4><ul><li><code>rg</code></li></ul></div>
+        </li>
+      </ul>
+    </div>
+  `, "NixOS Search");
+  const out = htmlToMarkdown(html, { url: "https://search.nixos.org/packages?channel=unstable&show=ripgrep&query=ripgrep" });
+  assert.match(out.markdown, /15\.2\.0/);
+  assert.match(out.markdown, /Programs provided/);
+  assert.match(out.markdown, /\brg\b/);
+  assert.match(out.markdown, /Unlicense/);
+  assert.match(out.markdown, /MIT/);
+});
+
 test("truncates oversized markdown with an explicit marker", () => {
   const paragraph = `<p>HEADMARKER_START ${"word ".repeat(120)}</p>`;
   const html = page(`${paragraph.repeat(1600)}<p>TAILMARKER_END</p>`, "Long");

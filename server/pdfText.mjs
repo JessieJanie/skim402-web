@@ -9,6 +9,10 @@
  * is a content stream and the bytes contain Tj or TJ. Quote operators
  * outside a text object are ignored. Lines that are mostly control
  * characters are dropped.
+ *
+ * Subset fonts (Census appendix tables) store digits as character codes
+ * below 32. The page's ToUnicode CMap is what turns those bytes into
+ * "132,200". Without it the line is control characters and gets dropped.
  */
 
 import { inflateRawSync, inflateSync } from "node:zlib";
@@ -153,7 +157,9 @@ function tokenizeContent(src) {
         raw += src[i];
         i += 1;
       }
-      tokens.push({ t: "str", v: toWinAnsiUnicode(decodeLiteral(raw)) });
+      // Keep the raw bytes. A subset font's ToUnicode map is applied later,
+      // once we know which font Tf selected.
+      tokens.push({ t: "str", v: decodeLiteral(raw), raw: true });
       continue;
     }
     if (c === "<") {
@@ -164,7 +170,19 @@ function tokenizeContent(src) {
       }
       const hex = /^<[0-9A-Fa-f\s]*>/.exec(src.slice(i));
       if (hex) {
-        tokens.push({ t: "str", v: decodeHexString(hex[0].slice(1, -1)) });
+        const clean = hex[0].slice(1, -1).replace(/[^0-9A-Fa-f]/g, "");
+        const even = clean.length % 2 === 0 ? clean : `${clean}0`;
+        let buf = Buffer.alloc(0);
+        try {
+          buf = Buffer.from(even, "hex");
+        } catch {
+          buf = Buffer.alloc(0);
+        }
+        if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+          tokens.push({ t: "str", v: decodeHexString(clean), raw: false });
+        } else {
+          tokens.push({ t: "str", v: buf.toString("latin1"), raw: true });
+        }
         i += hex[0].length;
         continue;
       }
@@ -210,13 +228,26 @@ function tokenizeContent(src) {
   return tokens;
 }
 
+function decodeShown(raw, map) {
+  if (!map || map.size === 0) return toWinAnsiUnicode(raw);
+  let out = "";
+  for (let i = 0; i < raw.length; i += 1) {
+    const code = raw.charCodeAt(i) & 255;
+    const hit = map.get(code);
+    out += hit !== undefined ? hit : toWinAnsiUnicode(raw[i]);
+  }
+  return out;
+}
+
 /**
  * Reading-order lines from a content stream.
  * Text showing operators are kept in stream order and joined on the same
  * baseline, so a word split across TJ kerning runs ("Novem" + "ber") and a
  * number split across Tj runs ("10:" + "3" + "0") stay intact.
+ *
+ * fontMaps is font resource name -> ToUnicode code map for this stream.
  */
-export function extractStringsFromContent(content) {
+export function extractStringsFromContent(content, fontMaps) {
   const src = typeof content === "string" ? content : content.toString("latin1");
   const tokens = tokenizeContent(src);
   const lines = [];
@@ -226,10 +257,17 @@ export function extractStringsFromContent(content) {
   let renderMode = 0;
   let leading = 0;
   let inText = false;
+  let activeFont = "";
+  let seenName = "";
   const nums = [];
   let array = null;
   let pendingArray = null;
   let lastStr = "";
+
+  function shown(tok) {
+    if (!tok.raw) return tok.v;
+    return decodeShown(tok.v, fontMaps && fontMaps[activeFont]);
+  }
 
   function flush() {
     const cleaned = buf.replace(/[ \t\f\v]+/g, " ").trim();
@@ -259,11 +297,21 @@ export function extractStringsFromContent(content) {
       continue;
     }
     if (tok.t === "str") {
-      if (array) array.push(tok.v);
-      else lastStr = tok.v;
+      const text = shown(tok);
+      if (array) array.push(text);
+      else lastStr = text;
+      continue;
+    }
+    if (tok.t === "name") {
+      seenName = tok.v.slice(1);
       continue;
     }
     if (tok.t !== "op") continue;
+    if (tok.v === "Tf") {
+      if (seenName) activeFont = seenName;
+      nums.length = 0;
+      continue;
+    }
     if (tok.v === "BT") {
       inText = true;
       continue;
@@ -439,6 +487,186 @@ function streamDict(src, streamIndex) {
   return src.slice(Math.max(0, streamIndex - 400), streamIndex);
 }
 
+function objectIdBefore(src, streamIndex) {
+  const window = src.slice(Math.max(0, streamIndex - 6000), streamIndex);
+  const matches = [...window.matchAll(/(\d+)\s+0\s+obj/g)];
+  if (!matches.length) return null;
+  return Number(matches[matches.length - 1][1]);
+}
+
+function balancedDict(src, start) {
+  if (src[start] !== "<" || src[start + 1] !== "<") return "";
+  let depth = 0;
+  for (let i = start; i < src.length - 1; i += 1) {
+    if (src[i] === "<" && src[i + 1] === "<") {
+      depth += 1;
+      i += 1;
+      continue;
+    }
+    if (src[i] === ">" && src[i + 1] === ">") {
+      depth -= 1;
+      if (depth === 0) return src.slice(start, i + 2);
+      i += 1;
+    }
+    if (i - start > 80000) return "";
+  }
+  return "";
+}
+
+function utf16Hex(hex) {
+  const even = hex.length % 4 === 0 ? hex : hex.padStart(Math.ceil(hex.length / 4) * 4, "0");
+  let out = "";
+  for (let i = 0; i < even.length; i += 4) {
+    const code = parseInt(even.slice(i, i + 4), 16);
+    if (Number.isFinite(code)) out += String.fromCharCode(code);
+  }
+  return out;
+}
+
+function parseToUnicode(cmap) {
+  const map = new Map();
+  const bf = /beginbfchar\s*([\s\S]*?)endbfchar/g;
+  let block;
+  while ((block = bf.exec(cmap))) {
+    const pair = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g;
+    let item;
+    while ((item = pair.exec(block[1]))) {
+      map.set(parseInt(item[1], 16), utf16Hex(item[2]));
+    }
+  }
+  const br = /beginbfrange\s*([\s\S]*?)endbfrange/g;
+  while ((block = br.exec(cmap))) {
+    const range = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(?:<([0-9A-Fa-f]+)>|\[([^\]]*)\])/g;
+    let item;
+    while ((item = range.exec(block[1]))) {
+      const start = parseInt(item[1], 16);
+      const end = parseInt(item[2], 16);
+      if (end - start > 2000) continue;
+      if (item[3]) {
+        const dest = parseInt(item[3], 16);
+        for (let code = start; code <= end; code += 1) {
+          map.set(code, String.fromCharCode(dest + (code - start)));
+        }
+      } else {
+        const dests = [...item[4].matchAll(/<([0-9A-Fa-f]+)>/g)].map((hit) => utf16Hex(hit[1]));
+        dests.forEach((text, index) => {
+          if (start + index <= end) map.set(start + index, text);
+        });
+      }
+    }
+  }
+  return map;
+}
+
+function streamText(stream) {
+  if (!stream) return "";
+  let bytes = stream.raw;
+  if (stream.flate) {
+    const inflated = inflateStream(bytes);
+    if (!inflated) return "";
+    bytes = inflated;
+  }
+  return bytes.toString("latin1");
+}
+
+/** stream object id -> { fontName: Map<code, unicode> } from ToUnicode. */
+function loadStreamFontMaps(buffer, streams) {
+  const src = buffer.toString("latin1");
+  const streamById = new Map();
+  for (const stream of streams) {
+    if (stream.id != null) streamById.set(stream.id, stream);
+  }
+  const fontToCmap = new Map();
+  const dicts = [];
+
+  function noteFont(id, body) {
+    const toUnicode = /\/ToUnicode\s+(\d+)\s+0\s+R/.exec(body);
+    if (toUnicode) fontToCmap.set(id, Number(toUnicode[1]));
+  }
+
+  const objRe = /(\d+)\s+0\s+obj/g;
+  let match;
+  while ((match = objRe.exec(src))) {
+    let i = match.index + match[0].length;
+    while (i < src.length && /\s/.test(src[i])) i += 1;
+    if (!src.startsWith("<<", i)) continue;
+    const dict = balancedDict(src, i);
+    if (!dict) continue;
+    if (!/\/(?:Contents|Font|ToUnicode|BaseFont|Subtype)\b/.test(dict)) continue;
+    const id = Number(match[1]);
+    dicts.push({ id, dict });
+    if (/\/BaseFont\b/.test(dict) || /\/ToUnicode\b/.test(dict)) noteFont(id, dict);
+  }
+
+  for (const stream of streams) {
+    if (!/\/Type\s*\/ObjStm\b/.test(stream.before)) continue;
+    const latin = streamText(stream);
+    if (!latin) continue;
+    const count = Number((/\/N\s+(\d+)/.exec(stream.before) || [])[1]);
+    const first = Number((/\/First\s+(\d+)/.exec(stream.before) || [])[1]);
+    if (!count || !Number.isFinite(first) || first < 0 || first > latin.length) continue;
+    const header = latin.slice(0, first).trim().split(/\s+/);
+    const pairs = [];
+    for (let i = 0; i + 1 < header.length; i += 2) {
+      pairs.push([Number(header[i]), Number(header[i + 1])]);
+    }
+    for (let i = 0; i < pairs.length; i += 1) {
+      const [id, offset] = pairs[i];
+      if (!Number.isFinite(id) || !Number.isFinite(offset)) continue;
+      const start = first + offset;
+      const end = i + 1 < pairs.length ? first + pairs[i + 1][1] : latin.length;
+      if (start < 0 || end <= start || end > latin.length + 1) continue;
+      const body = latin.slice(start, end);
+      if (/\/ToUnicode\b/.test(body) || /\/BaseFont\b/.test(body)) noteFont(id, body);
+      if (/\/Contents\b/.test(body) || /\/Subtype\s*\/Form\b/.test(body)) dicts.push({ id, dict: body });
+    }
+  }
+
+  const cmapCache = new Map();
+  function cmapFor(cmapId) {
+    if (cmapCache.has(cmapId)) return cmapCache.get(cmapId);
+    const text = streamText(streamById.get(cmapId));
+    const map = text && (text.includes("beginbfchar") || text.includes("beginbfrange"))
+      ? parseToUnicode(text)
+      : new Map();
+    cmapCache.set(cmapId, map);
+    return map;
+  }
+
+  const byStream = new Map();
+  for (const { id, dict } of dicts) {
+    const block = /\/Font\s*<<([^>]*)>>/.exec(dict);
+    if (!block) continue;
+    const fonts = {};
+    const fontRef = /\/([A-Za-z0-9_.]+)\s+(\d+)\s+0\s+R/g;
+    let font;
+    let any = false;
+    while ((font = fontRef.exec(block[1]))) {
+      const cmapId = fontToCmap.get(Number(font[2]));
+      if (!cmapId) continue;
+      const map = cmapFor(cmapId);
+      if (map && map.size) {
+        fonts[font[1]] = map;
+        any = true;
+      }
+    }
+    if (!any) continue;
+    const streamIds = [];
+    const single = /\/Contents\s+(\d+)\s+0\s+R/g;
+    let one;
+    while ((one = single.exec(dict))) streamIds.push(Number(one[1]));
+    const many = /\/Contents\s*\[([^\]]*)\]/.exec(dict);
+    if (many) {
+      for (const ref of many[1].match(/(\d+)\s+0\s+R/g) || []) {
+        streamIds.push(Number(ref));
+      }
+    }
+    if (/\/Subtype\s*\/Form\b/.test(dict)) streamIds.push(id);
+    for (const streamId of streamIds) byStream.set(streamId, fonts);
+  }
+  return byStream;
+}
+
 function collectStreams(buffer) {
   const src = buffer.toString("latin1");
   const streams = [];
@@ -446,9 +674,10 @@ function collectStreams(buffer) {
   let match;
   while ((match = re.exec(src))) {
     const before = streamDict(src, match.index);
+    const id = objectIdBefore(src, match.index);
     const flate = /\/Filter\s*\/FlateDecode/.test(before) || /\/FlateDecode/.test(before);
     const raw = Buffer.from(match[1].replace(/\r\n$/, "").replace(/\n$/, ""), "latin1");
-    streams.push({ flate, raw, before });
+    streams.push({ flate, raw, before, id });
   }
   return streams;
 }
@@ -468,6 +697,12 @@ export function extractOutline(buffer) {
 
 export function pdfToMarkdown(buffer) {
   const streams = collectStreams(buffer);
+  let fontMaps = new Map();
+  try {
+    fontMaps = loadStreamFontMaps(buffer, streams);
+  } catch {
+    fontMaps = new Map();
+  }
   const lines = [];
   for (const stream of streams) {
     if (isNonTextStream(stream.before)) continue;
@@ -479,7 +714,7 @@ export function pdfToMarkdown(buffer) {
     }
     const latin = bytes.toString("latin1");
     if (!looksLikePageContent(latin)) continue;
-    const strings = extractStringsFromContent(latin);
+    const strings = extractStringsFromContent(latin, fontMaps.get(stream.id));
     for (const s of strings) {
       const cleaned = sanitizeLine(s.replace(/\s+/g, " ").trim());
       if (cleaned) lines.push(cleaned);

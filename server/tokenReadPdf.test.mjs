@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import { createReadPdfHandler, PDF_CREDITS } from "./tokenReadPdf.mjs";
-import { looksLikePdf, pdfToMarkdown, extractStringsFromContent } from "./pdfText.mjs";
+import { looksLikePdf, pdfToMarkdown, extractStringsFromContent, controlCharCount, junkRatio } from "./pdfText.mjs";
 
 function minimalPdf(text = "Hello from the PDF") {
   const stream = `BT /F1 12 Tf 72 720 Td (${text}) Tj ET\n`;
@@ -66,6 +70,78 @@ test("joins words and times split across kerning runs", () => {
   assert.deepEqual(shifted, ["10:30"]);
   const wrapped = extractStringsFromContent("BT (Novem-) Tj 0 -14 Td (ber) Tj ET");
   assert.deepEqual(wrapped, ["November"]);
+});
+
+function pdfWithBinaryNoise() {
+  const text = [
+    "(binary junk outside text) '",
+    "BT /F1 12 Tf 72 700 Td (November 6-7 adjourned at 10:30) Tj ET",
+    "BT (\x00\x01\x02\x03\x04\x05 not text) Tj ET",
+    "",
+  ].join("\n");
+  const font = "\x00\x01BT}\x02(font program bytes\x00\x01) ' \x7f\x80\x81 more font";
+  const image = "BT (image bytes should not appear) Tj ET\n";
+  const body = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 9 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length ${text.length} >>
+stream
+${text}endstream
+endobj
+7 0 obj
+<< /Length ${font.length} /Length1 20 /Length2 40 /Length3 0 >>
+stream
+${font}endstream
+endobj
+8 0 obj
+<< /Type /XObject /Subtype /Image /Width 2 /Height 2 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length ${image.length} >>
+stream
+${image}endstream
+endobj
+9 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+trailer
+<< /Root 1 0 R >>
+%%EOF
+`;
+  return Buffer.from(body, "latin1");
+}
+
+test("drops font, image, and control-character streams", () => {
+  const pdf = pdfWithBinaryNoise();
+  const parsed = pdfToMarkdown(pdf);
+  assert.match(parsed.text, /November 6-7 adjourned at 10:30/);
+  assert.equal(parsed.text.includes("font program"), false);
+  assert.equal(parsed.text.includes("image bytes"), false);
+  assert.equal(parsed.text.includes("binary junk outside"), false);
+  assert.equal(parsed.text.includes("not text"), false);
+  assert.equal(controlCharCount(parsed.markdown), 0);
+  assert.ok(junkRatio(parsed.markdown) < 0.005);
+
+  const dir = mkdtempSync(join(tmpdir(), "skim-pdf-"));
+  const pdfPath = join(dir, "sample.pdf");
+  const txtPath = join(dir, "sample.txt");
+  try {
+    writeFileSync(pdfPath, pdf);
+    execFileSync("pdftotext", ["-q", pdfPath, txtPath], { timeout: 15000 });
+    const poppler = readFileSync(txtPath, "utf8");
+    assert.match(poppler, /10:30/);
+    assert.ok(
+      parsed.markdown.length <= Math.max(poppler.length * 1.35, poppler.length + 80),
+      `markdown ${parsed.markdown.length} vs pdftotext ${poppler.length}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("looksLikePdf requires %PDF-", () => {

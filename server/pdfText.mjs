@@ -1,6 +1,14 @@
 /**
  * Deterministic PDF → text / outline. No LLM. Text comes only from the file.
  * Handles uncompressed streams and FlateDecode; good enough for digital PDFs.
+ *
+ * Page content is the only text we keep. Embedded font programs (/Length1,
+ * /FontFile), images, metadata, and object/xref streams often contain the
+ * bytes "BT" or a quote mark by accident. Treating those as text operators
+ * emits long runs of binary. A stream is read only when its own dictionary
+ * is a content stream and the bytes contain Tj or TJ. Quote operators
+ * outside a text object are ignored. Lines that are mostly control
+ * characters are dropped.
  */
 
 import { inflateRawSync, inflateSync } from "node:zlib";
@@ -217,6 +225,7 @@ export function extractStringsFromContent(content) {
   let anchorY = null;
   let renderMode = 0;
   let leading = 0;
+  let inText = false;
   const nums = [];
   let array = null;
   let pendingArray = null;
@@ -255,6 +264,17 @@ export function extractStringsFromContent(content) {
       continue;
     }
     if (tok.t !== "op") continue;
+    if (tok.v === "BT") {
+      inText = true;
+      continue;
+    }
+    if (tok.v === "ET") {
+      flush();
+      inText = false;
+      lastStr = "";
+      pendingArray = null;
+      continue;
+    }
     if (tok.v === "[") {
       array = [];
       continue;
@@ -282,9 +302,13 @@ export function extractStringsFromContent(content) {
       nums.length = 0;
       continue;
     }
+    // Quote operators show a string and move to the next line. Outside a
+    // text object they are just bytes inside a font or image stream.
     if (tok.v === "'" || tok.v === '"') {
-      y -= leading || 1;
-      append(lastStr);
+      if (inText) {
+        y -= leading || 1;
+        append(lastStr);
+      }
       lastStr = "";
       nums.length = 0;
       continue;
@@ -336,13 +360,92 @@ function rejoinWrappedWords(lines) {
   return out;
 }
 
+/** C0 except tab/LF/CR, C1 controls, and U+FFFD. */
+export function controlCharCount(text) {
+  let count = 0;
+  for (const ch of String(text || "")) {
+    const code = ch.codePointAt(0);
+    if (code === 0xfffd) count += 1;
+    else if (code < 32 && code !== 9 && code !== 10 && code !== 13) count += 1;
+    else if (code >= 0x7f && code <= 0x9f) count += 1;
+  }
+  return count;
+}
+
+export function junkRatio(text) {
+  const value = String(text || "");
+  if (!value.length) return 0;
+  return controlCharCount(value) / value.length;
+}
+
+const CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\ufffd]/g;
+
+/**
+ * Font and image bytes that leak into a text line are mostly controls.
+ * A bullet or one bad byte on a real sentence is not. Strip the rare
+ * controls; drop the line when they dominate it.
+ */
+function sanitizeLine(text) {
+  const junk = controlCharCount(text);
+  if (!junk) return text;
+  const letters = (text.match(/[A-Za-z]/g) || []).length;
+  const ratio = junk / text.length;
+  if (ratio > 0.15) return "";
+  if (junk >= 8 && letters / text.length < 0.4) return "";
+  if (letters === 0) return "";
+  return text.replace(CONTROL_CHARS, "");
+}
+
+/** Font programs, images, metadata, and compressed object streams are not page text. */
+function isNonTextStream(dict) {
+  const header = dict || "";
+  if (/\/Length1\b/.test(header)) return true;
+  if (/\/FontFile\d?\b/.test(header)) return true;
+  if (/\/Subtype\s*\/Image\b/.test(header)) return true;
+  if (/\/Subtype\s*\/XML\b/.test(header)) return true;
+  if (/\/Type\s*\/Metadata\b/.test(header)) return true;
+  if (/\/Type\s*\/XRef\b/.test(header)) return true;
+  if (/\/Type\s*\/ObjStm\b/.test(header)) return true;
+  return false;
+}
+
+function looksLikePageContent(latin) {
+  // TJ/Tj are the text-showing operators. Some page streams omit BT and
+  // still contain TJ. A bare "BT" or a quote byte is not enough: font
+  // programs contain those by accident.
+  return /\bTj\b/.test(latin) || /\bTJ\b/.test(latin);
+}
+
+/** Dictionary that belongs to this stream, not the previous object. */
+function streamDict(src, streamIndex) {
+  let end = streamIndex - 1;
+  while (end >= 0 && /\s/.test(src[end])) end -= 1;
+  if (end < 1 || src[end] !== ">" || src[end - 1] !== ">") {
+    return src.slice(Math.max(0, streamIndex - 400), streamIndex);
+  }
+  let depth = 0;
+  for (let i = end; i >= 1; i -= 1) {
+    if (src[i] === ">" && src[i - 1] === ">") {
+      depth += 1;
+      i -= 1;
+      continue;
+    }
+    if (src[i] === "<" && src[i - 1] === "<") {
+      depth -= 1;
+      if (depth === 0) return src.slice(i - 1, end + 1);
+      i -= 1;
+    }
+  }
+  return src.slice(Math.max(0, streamIndex - 400), streamIndex);
+}
+
 function collectStreams(buffer) {
   const src = buffer.toString("latin1");
   const streams = [];
   const re = /stream\r?\n([\s\S]*?)endstream/g;
   let match;
   while ((match = re.exec(src))) {
-    const before = src.slice(Math.max(0, match.index - 400), match.index);
+    const before = streamDict(src, match.index);
     const flate = /\/Filter\s*\/FlateDecode/.test(before) || /\/FlateDecode/.test(before);
     const raw = Buffer.from(match[1].replace(/\r\n$/, "").replace(/\n$/, ""), "latin1");
     streams.push({ flate, raw, before });
@@ -367,6 +470,7 @@ export function pdfToMarkdown(buffer) {
   const streams = collectStreams(buffer);
   const lines = [];
   for (const stream of streams) {
+    if (isNonTextStream(stream.before)) continue;
     let bytes = stream.raw;
     if (stream.flate) {
       const inflated = inflateStream(bytes);
@@ -374,20 +478,22 @@ export function pdfToMarkdown(buffer) {
       bytes = inflated;
     }
     const latin = bytes.toString("latin1");
-    if (!/[Tt][jJ]/.test(latin) && !/BT/.test(latin)) continue;
+    if (!looksLikePageContent(latin)) continue;
     const strings = extractStringsFromContent(latin);
     for (const s of strings) {
-      const cleaned = s.replace(/\s+/g, " ").trim();
+      const cleaned = sanitizeLine(s.replace(/\s+/g, " ").trim());
       if (cleaned) lines.push(cleaned);
     }
   }
 
   if (lines.length === 0) {
     const whole = buffer.toString("latin1");
-    const fallback = extractStringsFromContent(whole);
-    for (const s of fallback) {
-      const cleaned = s.replace(/\s+/g, " ").trim();
-      if (cleaned) lines.push(cleaned);
+    if (looksLikePageContent(whole)) {
+      const fallback = extractStringsFromContent(whole);
+      for (const s of fallback) {
+        const cleaned = sanitizeLine(s.replace(/\s+/g, " ").trim());
+        if (cleaned) lines.push(cleaned);
+      }
     }
   }
 

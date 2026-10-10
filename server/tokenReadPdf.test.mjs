@@ -58,6 +58,16 @@ test("extracts literal Tj strings and outline titles", () => {
   assert.match(parsed.markdown, /Clean markdown from PDF/);
 });
 
+test("joins words and times split across kerning runs", () => {
+  const stream = "BT /F1 12 Tf 72 700 Td [(Novem)-11(ber 6\\2267)] TJ 0 -16 Td [(10:)-8(3)-8(0)] TJ ET";
+  const lines = extractStringsFromContent(stream);
+  assert.deepEqual(lines, ["November 6–7", "10:30"]);
+  const shifted = extractStringsFromContent("BT (10:) Tj 8 0 Td (3) Tj 6 0 Td (0) Tj ET");
+  assert.deepEqual(shifted, ["10:30"]);
+  const wrapped = extractStringsFromContent("BT (Novem-) Tj 0 -14 Td (ber) Tj ET");
+  assert.deepEqual(wrapped, ["November"]);
+});
+
 test("looksLikePdf requires %PDF-", () => {
   assert.equal(looksLikePdf(minimalPdf()), true);
   assert.equal(looksLikePdf(Buffer.from("<html>nope</html>")), false);

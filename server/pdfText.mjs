@@ -54,36 +54,284 @@ function decodeLiteral(raw) {
   return pdfUnescape(raw);
 }
 
+// Windows-1252 bytes that are not the same Unicode scalar as Latin-1.
+// PDF WinAnsi uses these for dashes, quotes, and similar glyphs.
+const WIN1252_EXTRA = {
+  0x80: "\u20ac",
+  0x82: "\u201a",
+  0x83: "\u0192",
+  0x84: "\u201e",
+  0x85: "\u2026",
+  0x86: "\u2020",
+  0x87: "\u2021",
+  0x88: "\u02c6",
+  0x89: "\u2030",
+  0x8a: "\u0160",
+  0x8b: "\u2039",
+  0x8c: "\u0152",
+  0x8e: "\u017d",
+  0x91: "\u2018",
+  0x92: "\u2019",
+  0x93: "\u201c",
+  0x94: "\u201d",
+  0x95: "\u2022",
+  0x96: "\u2013",
+  0x97: "\u2014",
+  0x98: "\u02dc",
+  0x99: "\u2122",
+  0x9a: "\u0161",
+  0x9b: "\u203a",
+  0x9c: "\u0153",
+  0x9e: "\u017e",
+  0x9f: "\u0178",
+};
+
+function toWinAnsiUnicode(text) {
+  let out = "";
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    out += WIN1252_EXTRA[code] ?? text[i];
+  }
+  return out;
+}
+
 function decodeHexString(hex) {
   const clean = hex.replace(/[^0-9a-fA-F]/g, "");
   const even = clean.length % 2 === 0 ? clean : `${clean}0`;
+  let buf;
   try {
-    return Buffer.from(even, "hex").toString("utf8");
+    buf = Buffer.from(even, "hex");
   } catch {
     return "";
   }
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+    const payload = Buffer.from(buf.subarray(2));
+    const evenPayload = payload.length % 2 === 0 ? payload : Buffer.concat([payload, Buffer.from([0])]);
+    try {
+      return Buffer.from(evenPayload).swap16().toString("utf16le");
+    } catch {
+      return toWinAnsiUnicode(buf.toString("latin1"));
+    }
+  }
+  return toWinAnsiUnicode(buf.toString("latin1"));
 }
 
-export function extractStringsFromContent(content) {
-  const out = [];
-  const src = typeof content === "string" ? content : content.toString("latin1");
-  const tj = /\((?:\\.|[^\\)])*\)\s*T[jJ]/g;
-  let match;
-  while ((match = tj.exec(src))) {
-    const inner = match[0].replace(/\s*T[jJ]$/, "");
-    out.push(decodeLiteral(inner.slice(1, -1)));
-  }
-  const arr = /\[(.*?)\]\s*TJ/gs;
-  while ((match = arr.exec(src))) {
-    const body = match[1];
-    const parts = [];
-    const piece = /\((?:\\.|[^\\)])*\)|<([0-9a-fA-F]+)>/g;
-    let p;
-    while ((p = piece.exec(body))) {
-      if (p[0].startsWith("(")) parts.push(decodeLiteral(p[0].slice(1, -1)));
-      else parts.push(decodeHexString(p[1]));
+function tokenizeContent(src) {
+  const tokens = [];
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === "%") {
+      while (i < src.length && src[i] !== "\n") i += 1;
+      continue;
     }
-    if (parts.length) out.push(parts.join(""));
+    if (c === " " || c === "\t" || c === "\r" || c === "\n" || c === "\f" || c === "\0") {
+      i += 1;
+      continue;
+    }
+    if (c === "(") {
+      i += 1;
+      let raw = "";
+      while (i < src.length) {
+        if (src[i] === "\\") {
+          raw += src[i] + (src[i + 1] ?? "");
+          i += 2;
+          continue;
+        }
+        if (src[i] === ")") {
+          i += 1;
+          break;
+        }
+        raw += src[i];
+        i += 1;
+      }
+      tokens.push({ t: "str", v: toWinAnsiUnicode(decodeLiteral(raw)) });
+      continue;
+    }
+    if (c === "<") {
+      if (src[i + 1] === "<") {
+        tokens.push({ t: "op", v: "<<" });
+        i += 2;
+        continue;
+      }
+      const hex = /^<[0-9A-Fa-f\s]*>/.exec(src.slice(i));
+      if (hex) {
+        tokens.push({ t: "str", v: decodeHexString(hex[0].slice(1, -1)) });
+        i += hex[0].length;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+    if (c === ">") {
+      if (src[i + 1] === ">") {
+        tokens.push({ t: "op", v: ">>" });
+        i += 2;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+    if (c === "[" || c === "]") {
+      tokens.push({ t: "op", v: c });
+      i += 1;
+      continue;
+    }
+    const num = /^[+-]?(?:\d+\.\d*|\.\d+|\d+)/.exec(src.slice(i));
+    if (num && num[0] !== "+" && num[0] !== "-") {
+      tokens.push({ t: "num", v: Number(num[0]) });
+      i += num[0].length;
+      continue;
+    }
+    if (c === "/") {
+      const name = /^\/[^\s[\]<>()/%]+/.exec(src.slice(i));
+      if (name) {
+        tokens.push({ t: "name", v: name[0] });
+        i += name[0].length;
+        continue;
+      }
+    }
+    const ident = /^[A-Za-z*'"][A-Za-z0-9*'"]*/.exec(src.slice(i));
+    if (ident) {
+      tokens.push({ t: "op", v: ident[0] });
+      i += ident[0].length;
+      continue;
+    }
+    i += 1;
+  }
+  return tokens;
+}
+
+/**
+ * Reading-order lines from a content stream.
+ * Text showing operators are kept in stream order and joined on the same
+ * baseline, so a word split across TJ kerning runs ("Novem" + "ber") and a
+ * number split across Tj runs ("10:" + "3" + "0") stay intact.
+ */
+export function extractStringsFromContent(content) {
+  const src = typeof content === "string" ? content : content.toString("latin1");
+  const tokens = tokenizeContent(src);
+  const lines = [];
+  let buf = "";
+  let y = 0;
+  let anchorY = null;
+  let renderMode = 0;
+  let leading = 0;
+  const nums = [];
+  let array = null;
+  let pendingArray = null;
+  let lastStr = "";
+
+  function flush() {
+    const cleaned = buf.replace(/[ \t\f\v]+/g, " ").trim();
+    if (cleaned) lines.push(cleaned);
+    buf = "";
+    anchorY = null;
+  }
+
+  function append(text) {
+    if (renderMode === 3 || !text) return;
+    if (anchorY !== null && Math.abs(y - anchorY) > 0.75) flush();
+    if (anchorY === null) anchorY = y;
+    buf += text;
+  }
+
+  function takeNums(count) {
+    const got = nums.splice(Math.max(0, nums.length - count), count);
+    while (got.length < count) got.unshift(0);
+    return got;
+  }
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const tok = tokens[i];
+    if (tok.t === "num") {
+      if (array) array.push(tok.v);
+      else nums.push(tok.v);
+      continue;
+    }
+    if (tok.t === "str") {
+      if (array) array.push(tok.v);
+      else lastStr = tok.v;
+      continue;
+    }
+    if (tok.t !== "op") continue;
+    if (tok.v === "[") {
+      array = [];
+      continue;
+    }
+    if (tok.v === "]") {
+      pendingArray = array;
+      array = null;
+      continue;
+    }
+    if (tok.v === "TJ") {
+      const items = pendingArray || [];
+      pendingArray = null;
+      let text = "";
+      for (const item of items) {
+        if (typeof item === "string") text += item;
+        else if (typeof item === "number" && item <= -80) text += " ";
+      }
+      append(text);
+      nums.length = 0;
+      continue;
+    }
+    if (tok.v === "Tj") {
+      append(lastStr);
+      lastStr = "";
+      nums.length = 0;
+      continue;
+    }
+    if (tok.v === "'" || tok.v === '"') {
+      y -= leading || 1;
+      append(lastStr);
+      lastStr = "";
+      nums.length = 0;
+      continue;
+    }
+    if (tok.v === "Td" || tok.v === "TD") {
+      const [tx, ty] = takeNums(2);
+      void tx;
+      if (Math.abs(ty) > 0.75) y += ty;
+      if (tok.v === "TD" && ty) leading = Math.abs(ty);
+      nums.length = 0;
+      continue;
+    }
+    if (tok.v === "Tm") {
+      const n = takeNums(6);
+      y = n[5];
+      nums.length = 0;
+      continue;
+    }
+    if (tok.v === "T*") {
+      y -= leading || 1;
+      continue;
+    }
+    if (tok.v === "Tr") {
+      renderMode = nums.length ? nums[nums.length - 1] : 0;
+      nums.length = 0;
+      continue;
+    }
+    if (tok.v === "TL") {
+      leading = Math.abs(nums.length ? nums[nums.length - 1] : leading);
+      nums.length = 0;
+      continue;
+    }
+    if (/^[A-Za-z]/.test(tok.v)) nums.length = 0;
+  }
+  flush();
+  return rejoinWrappedWords(lines);
+}
+
+function rejoinWrappedWords(lines) {
+  const out = [];
+  for (const line of lines) {
+    const prev = out[out.length - 1];
+    if (prev && /[A-Za-z]-$/.test(prev) && /^[a-z]/.test(line)) {
+      out[out.length - 1] = `${prev.slice(0, -1)}${line}`;
+      continue;
+    }
+    out.push(line);
   }
   return out;
 }

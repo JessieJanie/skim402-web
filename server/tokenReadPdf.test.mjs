@@ -144,6 +144,108 @@ test("drops font, image, and control-character streams", () => {
   }
 });
 
+function numberTokens(text) {
+  return (String(text || "").match(/\d[\d,]*(?:\.\d+)?/g) || []).map((token) => token.replace(/,/g, ""));
+}
+
+/** Fraction of reference number tokens that appear in the extraction. */
+function numberRecall(got, reference) {
+  const counts = new Map();
+  for (const token of numberTokens(got)) counts.set(token, (counts.get(token) || 0) + 1);
+  const ref = numberTokens(reference);
+  let hit = 0;
+  for (const token of ref) {
+    const have = counts.get(token) || 0;
+    if (have > 0) {
+      hit += 1;
+      counts.set(token, have - 1);
+    }
+  }
+  return ref.length ? hit / ref.length : 1;
+}
+
+function pdfWithSubsetNumbers() {
+  // \036 \035 \036 \033 \034 \032 \032 is 1, 3, 1, comma, 2, 0, 0 via ToUnicode.
+  // The Encoding Differences array is what pdftotext uses for the same bytes.
+  const text = "BT /F1 12 Tf 72 700 Td (\\036\\035\\036\\033\\034\\032\\032) Tj ET\nBT /F1 12 Tf 72 680 Td (Hello households) Tj ET\n";
+  const cmap = `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /Adobe-Identity-UCS def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+5 beginbfchar
+<1E> <0031>
+<1D> <0033>
+<1C> <0032>
+<1B> <002C>
+<1A> <0030>
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop end end
+`;
+  const body = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length ${text.length} >>
+stream
+${text}endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /CensusSubset /ToUnicode 6 0 R /Encoding 7 0 R >>
+endobj
+6 0 obj
+<< /Length ${cmap.length} >>
+stream
+${cmap}endstream
+endobj
+7 0 obj
+<< /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [26 /zero /comma /two /three /one] >>
+endobj
+trailer
+<< /Root 1 0 R >>
+%%EOF
+`;
+  return Buffer.from(body, "latin1");
+}
+
+test("subset-font numbers match pdftotext via ToUnicode", () => {
+  const pdf = pdfWithSubsetNumbers();
+  const parsed = pdfToMarkdown(pdf);
+  assert.match(parsed.text, /131,200/);
+  assert.match(parsed.text, /Hello households/);
+  assert.equal(controlCharCount(parsed.markdown), 0);
+
+  const dir = mkdtempSync(join(tmpdir(), "skim-pdf-nums-"));
+  const pdfPath = join(dir, "sample.pdf");
+  const txtPath = join(dir, "sample.txt");
+  try {
+    writeFileSync(pdfPath, pdf);
+    execFileSync("pdftotext", ["-q", pdfPath, txtPath], { timeout: 15000 });
+    const poppler = readFileSync(txtPath, "utf8");
+    assert.match(poppler, /131[,]?200/);
+    const recall = numberRecall(parsed.markdown, poppler);
+    assert.ok(recall >= 0.9, `number recall ${recall} skim=${parsed.markdown} poppler=${poppler}`);
+    assert.ok(
+      parsed.markdown.length <= Math.max(poppler.length * 1.5, poppler.length + 40),
+      `markdown ${parsed.markdown.length} vs pdftotext ${poppler.length}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("looksLikePdf requires %PDF-", () => {
   assert.equal(looksLikePdf(minimalPdf()), true);
   assert.equal(looksLikePdf(Buffer.from("<html>nope</html>")), false);

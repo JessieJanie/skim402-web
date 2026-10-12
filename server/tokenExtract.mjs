@@ -24,12 +24,12 @@ import {
   connectMiddleware,
   getBearerToken,
   header,
-  isBlockedUrl,
   remainingCredits,
   tokenExtract,
   verifyToken,
   vitePlugin,
 } from "./http.mjs";
+import { vetPublicUrl } from "./ssrfGuard.mjs";
 
 export const EXTRACT_CREDITS = 8;
 
@@ -167,7 +167,8 @@ export function createExtractHandler(opts = {}) {
       return { status: 400, body: { error: "url is required" } };
     }
     const target = rawUrl.trim();
-    if (isBlockedUrl(target)) {
+    const verdict = await vetPublicUrl(target, { lookup: opts.lookup });
+    if (!verdict.ok) {
       return {
         status: 403,
         body: {

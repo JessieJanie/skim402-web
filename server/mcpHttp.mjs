@@ -32,6 +32,7 @@ import {
   readJsonResponse,
   vitePlugin,
 } from "./http.mjs";
+import { vetPublicUrl } from "./ssrfGuard.mjs";
 import { normalizeStartUrl } from "./tokenCrawl.mjs";
 import {
   OPENAI_CHALLENGE_PATH,
@@ -190,53 +191,21 @@ export function getMcpApiKey(headers) {
   return null;
 }
 
-function dottedFromInt(n) {
-  return `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`;
-}
-
-/** SSRF + file:// gate for OpenAI negative tests. Does not loosen /t/read rules. */
+/** SSRF + file:// gate. Literal addresses use the shared guard; DNS vetting is async in callTool. */
 export function isDisallowedTarget(raw) {
   if (typeof raw !== "string" || !raw.trim()) return true;
   const value = raw.trim();
   if (/^file:/i.test(value)) return true;
   if (/^(javascript|data|ftp|ws|wss):/i.test(value)) return true;
-  if (isBlockedUrl(value)) return true;
-  let parsed;
-  try {
-    parsed = new URL(value);
-  } catch {
-    return true;
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return true;
-  // Some Node versions keep brackets in hostname ([::1]); strip before comparing.
-  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "0.0.0.0" ||
-    host === "::1" ||
-    host === "169.254.169.254"
-  ) {
-    return true;
-  }
-  if (host.includes(":")) {
-    if (
-      host.startsWith("fe80:") ||
-      /^f[cd][0-9a-f]{0,2}:/i.test(host) ||
-      host.startsWith("::ffff:") ||
-      host === "::" ||
-      host === "0:0:0:0:0:0:0:0"
-    ) {
-      return true;
-    }
-  }
-  if (/^\d+$/.test(host)) {
-    const n = Number(host);
-    if (Number.isSafeInteger(n) && n >= 0 && n <= 0xffffffff) {
-      return isBlockedUrl(`http://${dottedFromInt(n)}/`);
-    }
-  }
-  return false;
+  return isBlockedUrl(value);
+}
+
+async function rejectedTarget(raw, ctx) {
+  const syncError = publicHttpUrlError(raw);
+  if (syncError) return syncError;
+  const verdict = await vetPublicUrl(raw, { lookup: ctx.lookup });
+  if (!verdict.ok) return "URL resolves to a non-public address";
+  return null;
 }
 
 export function publicHttpUrlError(raw) {
@@ -519,7 +488,7 @@ async function callTool(name, args, ctx) {
   const input = args && typeof args === "object" && !Array.isArray(args) ? args : {};
 
   if (name === "read_url") {
-    const blocked = publicHttpUrlError(input.url);
+    const blocked = await rejectedTarget(input.url, ctx);
     if (blocked) return fail(blocked);
     const res = await apiRequest(ctx.fetchImpl, ctx.upstream, token, "GET", "/api/t/read", {
       query: { url: String(input.url).trim() },
@@ -533,7 +502,7 @@ async function callTool(name, args, ctx) {
     if (!Array.isArray(urls) || urls.length < 1) return fail("urls must be a non-empty array");
     if (urls.length > 10) return fail("urls is capped at 10");
     for (const url of urls) {
-      const blocked = publicHttpUrlError(url);
+      const blocked = await rejectedTarget(url, ctx);
       if (blocked) return fail(blocked);
     }
     const res = await apiRequest(ctx.fetchImpl, ctx.upstream, token, "POST", "/api/t/read/batch", {
@@ -554,7 +523,7 @@ async function callTool(name, args, ctx) {
   }
 
   if (name === "extract_url") {
-    const blocked = publicHttpUrlError(input.url);
+    const blocked = await rejectedTarget(input.url, ctx);
     if (blocked) return fail(blocked);
     const schema =
       input.schema && typeof input.schema === "object" && !Array.isArray(input.schema)
@@ -583,7 +552,8 @@ async function callTool(name, args, ctx) {
   if (name === "crawl_url") {
     const start = normalizeStartUrl(input.url);
     if (start.error) return fail(start.error);
-    if (isDisallowedTarget(start.url)) return fail("URL resolves to a non-public address");
+    const blocked = await rejectedTarget(start.url, ctx);
+    if (blocked) return fail(blocked);
     let maxPages = Number(input.maxPages);
     if (!Number.isFinite(maxPages) || maxPages <= 0) maxPages = undefined;
     const res = await apiRequest(ctx.fetchImpl, ctx.upstream, token, "POST", "/api/t/crawl", {
@@ -599,7 +569,7 @@ async function callTool(name, args, ctx) {
   }
 
   if (name === "read_pdf") {
-    const blocked = publicHttpUrlError(input.url);
+    const blocked = await rejectedTarget(input.url, ctx);
     if (blocked) return fail(blocked);
     const res = await apiRequest(ctx.fetchImpl, ctx.upstream, token, "POST", "/api/t/read-pdf", {
       body: {
@@ -629,7 +599,7 @@ async function callTool(name, args, ctx) {
     if (!Array.isArray(urls) || urls.length < 1) return fail("urls must be a non-empty array");
     if (urls.length > 20) return fail("urls is capped at 20");
     for (const url of urls) {
-      const blocked = publicHttpUrlError(url);
+      const blocked = await rejectedTarget(url, ctx);
       if (blocked) return fail(blocked);
     }
     const res = await apiRequest(ctx.fetchImpl, ctx.upstream, token, "POST", "/api/t/watch", {
@@ -817,7 +787,7 @@ export function createMcpHandler(opts = {}) {
     }
 
     const token = getMcpApiKey(request.headers);
-    const ctx = { token, fetchImpl, upstream };
+    const ctx = { token, fetchImpl, upstream, lookup: opts.lookup };
     const payload = request.body;
 
     if (Array.isArray(payload)) {

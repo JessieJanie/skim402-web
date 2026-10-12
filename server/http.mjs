@@ -1,11 +1,14 @@
 /**
  * Shared primitives for card-lane /api/t/* product routes.
- * Auth and SSRF match the existing token-watch sidecar (unchanged rules).
+ * User-URL fetches go through the shared SSRF guard (resolved addresses, pinned connect).
  */
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { connectPublic, isBlockedUrl, releaseConnection } from "./ssrfGuard.mjs";
+
+export { isBlockedUrl };
 
 export const MAX_BODY_BYTES = 64 * 1024;
 export const PDF_MAX_BYTES = 8 * 1024 * 1024;
@@ -38,34 +41,6 @@ export function getBearerToken(headers) {
   return null;
 }
 
-/** Same-origin / SSRF gate used by /t/read. Do not loosen. */
-export function isBlockedUrl(raw) {
-  let parsed;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    return true;
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return true;
-  const host = parsed.hostname.toLowerCase();
-  if (
-    host === "localhost" ||
-    host.endsWith(".localhost") ||
-    host === "127.0.0.1" ||
-    host === "0.0.0.0" ||
-    host === "::1" ||
-    host.endsWith(".local") ||
-    host.endsWith(".internal") ||
-    host === "169.254.169.254" ||
-    host === "metadata.google.internal"
-  ) {
-    return true;
-  }
-  if (/^10\./.test(host)) return true;
-  if (/^192\.168\./.test(host)) return true;
-  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return true;
-  return false;
-}
 
 export function isHttpsUrl(raw) {
   try {
@@ -157,77 +132,81 @@ export async function safeFetch(fetchImpl, rawUrl, opts = {}) {
   const timeoutMs = opts.timeoutMs ?? FETCH_TIMEOUT_MS;
   const method = opts.method ?? "GET";
   const headers = opts.headers ?? { "User-Agent": "Skim/1.0 (+https://skim402.com)" };
+  const lookup = opts.lookup;
   let current = rawUrl;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    if (isBlockedUrl(current)) {
-      return { blocked: true, url: current };
-    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let res;
-    try {
-      res = await fetchImpl(current, {
+    const connected = await connectPublic(
+      fetchImpl,
+      current,
+      {
         method,
         headers,
         redirect: "manual",
         signal: controller.signal,
-      });
-    } catch (err) {
-      return { error: err instanceof Error ? err.message : "fetch failed", url: current };
-    } finally {
-      clearTimeout(timer);
-    }
+      },
+      { lookup, timeoutMs },
+    );
+    clearTimeout(timer);
+    if (connected.blocked) return { blocked: true, url: current };
+    if (connected.error) return { error: connected.error, url: current };
+    const res = connected.response;
 
-    if (res.status >= 300 && res.status < 400) {
-      const loc = res.headers.get("location");
-      if (!loc) return { status: res.status, error: "redirect without location", url: current };
-      try {
-        current = new URL(loc, current).href;
-      } catch {
-        return { status: res.status, error: "invalid redirect", url: current };
+    try {
+      if (res.status >= 300 && res.status < 400) {
+        const loc = res.headers.get("location");
+        if (!loc) return { status: res.status, error: "redirect without location", url: current };
+        try {
+          current = new URL(loc, current).href;
+        } catch {
+          return { status: res.status, error: "invalid redirect", url: current };
+        }
+        continue;
       }
-      continue;
-    }
 
-    const declared = Number(res.headers.get("content-length") ?? "");
-    if (Number.isFinite(declared) && declared > maxBytes) {
-      return { tooLarge: true, contentLength: declared, status: res.status, url: current };
-    }
+      const declared = Number(res.headers.get("content-length") ?? "");
+      if (Number.isFinite(declared) && declared > maxBytes) {
+        return { tooLarge: true, contentLength: declared, status: res.status, url: current };
+      }
 
-    const chunks = [];
-    let size = 0;
-    if (res.body && typeof res.body.getReader === "function") {
-      const reader = res.body.getReader();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const buf = Buffer.from(value);
-        size += buf.length;
-        if (size > maxBytes) {
-          try {
-            reader.cancel();
-          } catch {
-            // ignore cancel errors
+      const chunks = [];
+      let size = 0;
+      if (res.body && typeof res.body.getReader === "function") {
+        const reader = res.body.getReader();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const buf = Buffer.from(value);
+          size += buf.length;
+          if (size > maxBytes) {
+            try {
+              reader.cancel();
+            } catch {
+              // ignore cancel errors
+            }
+            return { tooLarge: true, contentLength: size, status: res.status, url: current };
           }
-          return { tooLarge: true, contentLength: size, status: res.status, url: current };
+          chunks.push(buf);
+        }
+      } else {
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length > maxBytes) {
+          return { tooLarge: true, contentLength: buf.length, status: res.status, url: current };
         }
         chunks.push(buf);
       }
-    } else {
-      const buf = Buffer.from(await res.arrayBuffer());
-      if (buf.length > maxBytes) {
-        return { tooLarge: true, contentLength: buf.length, status: res.status, url: current };
-      }
-      chunks.push(buf);
-    }
 
-    return {
-      status: res.status,
-      url: current,
-      headers: res.headers,
-      buffer: Buffer.concat(chunks),
-      contentType: res.headers.get("content-type") ?? "",
-    };
+      return {
+        status: res.status,
+        url: current,
+        headers: res.headers,
+        buffer: Buffer.concat(chunks),
+        contentType: res.headers.get("content-type") ?? "",
+      };
+    } finally {
+      await releaseConnection(connected);
+    }
   }
   return { error: "too many redirects", url: current };
 }

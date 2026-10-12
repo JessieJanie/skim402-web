@@ -9,7 +9,6 @@
 import {
   connectMiddleware,
   getBearerToken,
-  isBlockedUrl,
   remainingCredits,
   safeFetch,
   tokenRead,
@@ -17,6 +16,7 @@ import {
   vitePlugin,
 } from "./http.mjs";
 import { PDF_MAX_BYTES, looksLikePdf, pdfToMarkdown } from "./pdfText.mjs";
+import { vetPublicUrl } from "./ssrfGuard.mjs";
 
 export const PDF_CREDITS = 3;
 
@@ -52,6 +52,7 @@ export function createReadPdfHandler(opts = {}) {
     "",
   );
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
+  const lookup = opts.lookup;
 
   return async function handleReadPdf(request) {
     const token = getBearerToken(request.headers);
@@ -79,7 +80,8 @@ export function createReadPdfHandler(opts = {}) {
       return { status: 400, body: { error: "url is required" } };
     }
     const target = raw.trim();
-    if (isBlockedUrl(target)) {
+    const verdict = await vetPublicUrl(target, { lookup, timeoutMs: 20_000 });
+    if (!verdict.ok) {
       return { status: 403, body: { error: "Invalid URL", message: "Private, loopback, and link-local addresses are blocked" } };
     }
 
@@ -87,7 +89,7 @@ export function createReadPdfHandler(opts = {}) {
       ? parsedUrl.searchParams.get("outline") !== "false"
       : body.outline !== false;
 
-    const fetched = await safeFetch(fetchImpl, target, { maxBytes: PDF_MAX_BYTES, timeoutMs: 20_000 });
+    const fetched = await safeFetch(fetchImpl, target, { maxBytes: PDF_MAX_BYTES, timeoutMs: 20_000, lookup });
     if (fetched.blocked) {
       return { status: 403, body: { error: "Invalid URL", message: "URL is blocked by SSRF rules" } };
     }

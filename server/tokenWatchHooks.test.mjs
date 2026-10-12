@@ -55,6 +55,9 @@ function mockFetch(routes) {
 const KEY = "sk402_testkey";
 const AUTH = { authorization: `Bearer ${KEY}` };
 
+/** Public unicast answer so webhook tests do not depend on live DNS for hooks.example.com. */
+const publicLookup = async () => [{ address: "93.184.216.34", family: 4 }];
+
 function readOk(text, title = "Page") {
   return {
     status: 200,
@@ -74,6 +77,7 @@ test("register + diff fires a signed webhook once per change", async () => {
   };
   const handle = createWatchHooksHandler({
     store: createMemoryStore(),
+    lookup: publicLookup,
     fetchImpl: async (url, init = {}) => {
       const parsed = new URL(url, "https://skim402.com");
       if (parsed.hostname === "hooks.example.com") {
@@ -148,6 +152,7 @@ test("PATCH updates webhook without creating a new watch", async () => {
   const store = createMemoryStore();
   const handle = createWatchHooksHandler({
     store,
+    lookup: publicLookup,
     fetchImpl: mockFetch({
       "GET /api/card/account": { body: { creditsRemaining: 20 } },
       "GET /api/t/read": readOk("hello", "Hi"),
@@ -191,10 +196,37 @@ test("webhook payload is small and idempotent by content hash", async () => {
     posts += 1;
     return new Response("ok", { status: 200 });
   };
-  const a = await deliverWebhook(fetchImpl, watch, item, "t1");
+  const a = await deliverWebhook(fetchImpl, watch, item, "t1", { lookup: publicLookup });
   watch.delivered[a.deliveryId] = "t1";
-  const b = await deliverWebhook(fetchImpl, watch, item, "t2");
+  const b = await deliverWebhook(fetchImpl, watch, item, "t2", { lookup: publicLookup });
   assert.equal(a.delivered, true);
   assert.equal(b.reason, "duplicate");
   assert.equal(posts, 1);
+});
+
+test("webhook delivery does not connect when DNS returns a private address", async () => {
+  let called = 0;
+  const result = await deliverWebhook(
+    async () => {
+      called += 1;
+      return new Response("ok", { status: 200 });
+    },
+    {
+      watchId: "w_abc",
+      webhookUrl: "https://rebind.example/hook",
+      webhookSecret: "whsec_z",
+      delivered: {},
+    },
+    {
+      url: "https://example.com/p",
+      status: "changed",
+      contentHash: "abc",
+      diff: { addedCount: 1, removedCount: 0, addedSample: ["hi"], removedSample: [], numericOnly: false, titleChanged: false },
+    },
+    "t1",
+    { lookup: async () => [{ address: "127.0.0.1", family: 4 }] },
+  );
+  assert.equal(result.delivered, false);
+  assert.equal(result.reason, "blocked");
+  assert.equal(called, 0);
 });

@@ -27,6 +27,7 @@ import {
   verifyToken,
   vitePlugin,
 } from "./http.mjs";
+import { connectPublic, releaseConnection, vetPublicUrl } from "./ssrfGuard.mjs";
 
 export const MIN_INTERVAL_SECONDS = 60;
 const MAX_URLS = 20;
@@ -127,7 +128,7 @@ export function webhookPayload(watch, item, polledAt) {
   };
 }
 
-export async function deliverWebhook(fetchImpl, watch, item, polledAt) {
+export async function deliverWebhook(fetchImpl, watch, item, polledAt, opts = {}) {
   if (!watch.webhookUrl || !watch.webhookSecret) {
     return { delivered: false, reason: "not_configured" };
   }
@@ -140,8 +141,10 @@ export async function deliverWebhook(fetchImpl, watch, item, polledAt) {
   const signature = signBody(watch.webhookSecret, raw);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
-  try {
-    const res = await fetchImpl(watch.webhookUrl, {
+  const connected = await connectPublic(
+    fetchImpl,
+    watch.webhookUrl,
+    {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -152,20 +155,24 @@ export async function deliverWebhook(fetchImpl, watch, item, polledAt) {
       body: raw,
       signal: controller.signal,
       redirect: "error",
-    });
+    },
+    { lookup: opts.lookup, timeoutMs: WEBHOOK_TIMEOUT_MS },
+  );
+  clearTimeout(timer);
+  try {
+    if (connected.blocked) {
+      return { delivered: false, reason: "blocked", deliveryId: payload.deliveryId };
+    }
+    if (connected.error) {
+      return { delivered: false, reason: connected.error, deliveryId: payload.deliveryId };
+    }
     return {
-      delivered: res.ok,
-      status: res.status,
-      deliveryId: payload.deliveryId,
-    };
-  } catch (err) {
-    return {
-      delivered: false,
-      reason: err instanceof Error ? err.message : "delivery_failed",
+      delivered: connected.response.ok,
+      status: connected.response.status,
       deliveryId: payload.deliveryId,
     };
   } finally {
-    clearTimeout(timer);
+    await releaseConnection(connected);
   }
 }
 
@@ -175,6 +182,7 @@ export function createWatchHooksHandler(opts = {}) {
     "",
   );
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
+  const lookup = opts.lookup;
   const store =
     opts.store ??
     createFileStore(opts.storePath ?? process.env.SKIM_WATCH_STORE ?? ".data/watches.json");
@@ -219,8 +227,16 @@ export function createWatchHooksHandler(opts = {}) {
   async function register(token, body) {
     const parsed = normalizeWatchUrls(body?.urls);
     if (parsed.error) return { status: parsed.status ?? 400, body: { error: parsed.error } };
+    for (const url of parsed.urls) {
+      const verdict = await vetPublicUrl(url, { lookup });
+      if (!verdict.ok) return { status: 400, body: { error: "Invalid URL" } };
+    }
     const hook = normalizeWebhookUrl(body?.webhookUrl);
     if (hook.error) return { status: hook.status ?? 400, body: { error: hook.error } };
+    if (hook.webhookUrl) {
+      const verdict = await vetPublicUrl(hook.webhookUrl, { lookup, timeoutMs: WEBHOOK_TIMEOUT_MS });
+      if (!verdict.ok) return { status: 400, body: { error: "webhookUrl must be a public https URL" } };
+    }
     const note =
       typeof body?.note === "string" && body.note.trim()
         ? body.note.trim().slice(0, 200)
@@ -284,6 +300,10 @@ export function createWatchHooksHandler(opts = {}) {
     }
     const hook = normalizeWebhookUrl(body.webhookUrl === undefined ? watch.webhookUrl : body.webhookUrl);
     if (hook.error) return { status: hook.status ?? 400, body: { error: hook.error } };
+    if (hook.webhookUrl) {
+      const verdict = await vetPublicUrl(hook.webhookUrl, { lookup, timeoutMs: WEBHOOK_TIMEOUT_MS });
+      if (!verdict.ok) return { status: 400, body: { error: "webhookUrl must be a public https URL" } };
+    }
     const rotate = Boolean(body.rotateSecret) || (hook.webhookUrl && hook.webhookUrl !== watch.webhookUrl);
     const webhookSecret = hook.webhookUrl
       ? rotate || !watch.webhookSecret
@@ -327,6 +347,19 @@ export function createWatchHooksHandler(opts = {}) {
     let changedCount = 0;
 
     for (const url of watch.urls) {
+      const verdict = await vetPublicUrl(url, { lookup });
+      if (!verdict.ok) {
+        items.push({
+          url,
+          status: "error",
+          title: pages[url]?.title ?? null,
+          error: {
+            status: 403,
+            message: "Private, loopback, and link-local addresses are blocked",
+          },
+        });
+        continue;
+      }
       const read = await tokenRead(fetchImpl, upstream, token, url);
       if (read.status === 401) return { status: 401, body: { error: "unknown token" } };
       if (read.status === 402) {
@@ -379,7 +412,7 @@ export function createWatchHooksHandler(opts = {}) {
     if (watch.webhookUrl && changedCount > 0) {
       for (const item of items) {
         if (item.status !== "changed") continue;
-        const result = await deliverWebhook(fetchImpl, { ...watch, delivered }, item, polledAt);
+        const result = await deliverWebhook(fetchImpl, { ...watch, delivered }, item, polledAt, { lookup });
         webhookDeliveries.push({
           url: item.url,
           deliveryId: result.deliveryId ?? null,

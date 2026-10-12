@@ -20,7 +20,8 @@ import { readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { isBlockedUrl } from "../server/http.mjs";
+import { safeFetch } from "../server/http.mjs";
+import { vetPublicUrl } from "../server/ssrfGuard.mjs";
 import { htmlToMarkdown } from "../server/htmlText.mjs";
 import { pdfToMarkdown } from "../server/pdfText.mjs";
 import { selectReaderHtml, serializeShadowTreeExpression } from "../server/renderDom.mjs";
@@ -113,14 +114,19 @@ function offlineFixtures() {
 }
 
 async function fetchBytes(url) {
-  if (isBlockedUrl(url)) throw new Error("blocked url");
-  const res = await fetch(url, {
-    redirect: "follow",
+  const fetched = await safeFetch(fetch, url, {
+    timeoutMs: 45_000,
+    maxBytes: 20 * 1024 * 1024,
     headers: { "User-Agent": "Skim/1.0 (+https://skim402.com)", Accept: "*/*" },
-    signal: AbortSignal.timeout(45000),
   });
-  const buf = Buffer.from(await res.arrayBuffer());
-  return { status: res.status, buf, type: res.headers.get("content-type") || "", finalUrl: res.url };
+  if (fetched.blocked) throw new Error("blocked url");
+  if (fetched.error || !fetched.buffer) throw new Error(fetched.error || "empty response");
+  return {
+    status: fetched.status,
+    buf: fetched.buffer,
+    type: fetched.contentType || "",
+    finalUrl: fetched.url,
+  };
 }
 
 function cdpSocket(wsUrl) {
@@ -201,7 +207,8 @@ async function withChrome(run) {
 }
 
 async function renderHtml(browser, url) {
-  if (isBlockedUrl(url)) throw new Error("blocked url");
+  const verdict = await vetPublicUrl(url);
+  if (!verdict.ok) throw new Error("blocked url");
   const created = await browser.send("Target.createTarget", { url: "about:blank" });
   const targetId = created.result?.targetId;
   if (!targetId) throw new Error("Chrome did not create a tab");

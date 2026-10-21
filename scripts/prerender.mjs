@@ -402,10 +402,10 @@ for (const route of routes) {
   const appHtml = render(route.path);
   const textLen = appHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().length;
   // /card/success is a short confirmation page by design.
-  // /card is a redirect stub — plans were consolidated into /pricing.
+  // /card and /account are redirect stubs (/pricing and /card/account).
   // The redesigned site chrome is much leaner (minimal footer), so static
   // text counts dropped across the board.
-  const minTextLen = ["/card/success", "/card"].includes(route.path) ? 100 : 300;
+  const minTextLen = ["/card/success", "/card", "/account"].includes(route.path) ? 100 : 300;
   if (textLen < minTextLen) {
     throw new Error(
       `[prerender] route ${route.path} rendered only ${textLen} chars of text — refusing to write a near-empty page`

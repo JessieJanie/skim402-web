@@ -713,30 +713,35 @@ env = { "SKIM_WALLET_PRIVATE_KEY" = "0xYOUR_BASE_WALLET_PRIVATE_KEY" }`}
             <H2 id="payment">Payment (x402)</H2>
             <P>
               The first request from an unpaid client returns{" "}
-              <InlineCode>402 Payment Required</InlineCode> with a JSON body
-              describing the payment requirement — amount, asset (USDC),
+              <InlineCode>402 Payment Required</InlineCode> and a base64-encoded{" "}
+              <InlineCode>PAYMENT-REQUIRED</InlineCode> header describing the
+              payment requirement — amount, asset (USDC),
               network (Base), and recipient address. An x402 client signs the
               payment, submits it to a facilitator, and retries the request
-              with the <InlineCode>X-PAYMENT</InlineCode> header.
+              with the <InlineCode>PAYMENT-SIGNATURE</InlineCode> header.
             </P>
             <H3>Example 402 response</H3>
             <Code>
 {`HTTP/1.1 402 Payment Required
-Content-Type: application/json
+PAYMENT-REQUIRED: <base64-encoded JSON, decoded below>
 
 {
-  "x402Version": 1,
+  "x402Version": 2,
+  "error": "Payment required",
+  "resource": {
+    "url": "https://skim402.com/api/v2/read",
+    "description": "Skim: clean reader — URL to agent-ready markdown + structured metadata",
+    "mimeType": "application/json"
+  },
   "accepts": [
     {
       "scheme": "exact",
-      "network": "base",
-      "maxAmountRequired": "2000",
-      "resource": "https://skim402.com/api/v1/read",
-      "description": "Skim: clean reader — URL to markdown + metadata",
-      "mimeType": "application/json",
+      "network": "eip155:8453",
+      "amount": "2000",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       "payTo": "0x...",
-      "maxTimeoutSeconds": 60,
-      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+      "maxTimeoutSeconds": 300,
+      "extra": { "name": "USD Coin", "version": "2" }
     }
   ]
 }`}
@@ -2483,9 +2488,13 @@ curl "https://skim402.com/api/t/feeds/x402/latest?limit=25" \\
                 <strong className="text-foreground">Wallet not charged.</strong>
               </Field>
               <Field name="402" type="payment required">
-                First-call response. Body contains the x402 payment
-                requirement. Sign it with your client, retry with{" "}
-                <InlineCode>X-PAYMENT</InlineCode> set.{" "}
+                First-call response. On x402 v2 the requirement is in the
+                base64 <InlineCode>PAYMENT-REQUIRED</InlineCode> header and
+                the body is empty. Sign it with your client and retry with{" "}
+                <InlineCode>PAYMENT-SIGNATURE</InlineCode> set. Legacy{" "}
+                <InlineCode>/api/v1</InlineCode> routes still return the
+                requirement in the JSON body and accept{" "}
+                <InlineCode>X-PAYMENT</InlineCode> on the retry.{" "}
                 <strong className="text-foreground">
                   Wallet not charged — this is the prompt to pay, not a
                   failed payment.

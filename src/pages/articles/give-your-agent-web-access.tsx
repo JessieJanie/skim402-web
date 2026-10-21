@@ -318,17 +318,14 @@ print(res.json()["markdown"])`}</Snippet>
               eyes:
             </p>
 
-            <Snippet>{`# 1. First call — server replies 402 Payment Required with x402 instructions
-curl -i -X POST https://skim402.com/api/v1/read \\
-  -H "Content-Type: application/json" \\
-  -d '{ "url": "https://example.com/article" }'
+            <Snippet>{`# 1. First call — server replies 402 Payment Required.
+#    The requirement is a base64 PAYMENT-REQUIRED header; the body is empty.
+curl -i "https://skim402.com/api/v2/read?url=https://example.com/article"
 
 # 2. Sign and submit payment with any x402 client, then retry the same
-#    request with the X-PAYMENT header set.
-curl -X POST https://skim402.com/api/v1/read \\
-  -H "Content-Type: application/json" \\
-  -H "X-PAYMENT: <base64-payment-payload>" \\
-  -d '{ "url": "https://example.com/article" }'`}</Snippet>
+#    request with the PAYMENT-SIGNATURE header set.
+curl "https://skim402.com/api/v2/read?url=https://example.com/article" \\
+  -H "PAYMENT-SIGNATURE: <base64-payment-payload>"`}</Snippet>
 
             <p>
               Skim works with any x402-compliant client — <code>x402-axios</code>

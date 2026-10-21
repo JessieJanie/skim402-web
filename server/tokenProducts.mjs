@@ -23,10 +23,14 @@
  *
  * Production Express (same host as /api/t/read):
  *   import { tokenProductsMiddleware } from "./tokenProducts.mjs";
+ *   import { agoreanReviewsMiddleware } from "./agoreanReviews.mjs";
+ *   app.use(agoreanReviewsMiddleware()); // before the x402 payment handler
  *   app.use(tokenProductsMiddleware({
  *     upstream: "https://skim402.com",
  *     refundCredits: (token, amount) => cardLedger.credit(token, amount),
  *   }));
+ * tokenProductsMiddleware also attaches the review hook, so an x402 handler
+ * reached through next() is decorated when this middleware runs first.
  * Mount this BEFORE any MCP SDK Streamable HTTP route at /mcp (or replace
  * that route). Live Scan Tools currently hits the SDK stub, which omits
  * destructiveHint.
@@ -46,6 +50,7 @@ import {
   openaiAppsChallengeMiddleware,
 } from "./openaiAppsChallenge.mjs";
 import { vitePlugin } from "./http.mjs";
+import { attachAgoreanReviews } from "./agoreanReviews.mjs";
 
 export function tokenProductsMiddleware(opts = {}) {
   const challenge = openaiAppsChallengeMiddleware(opts);
@@ -58,6 +63,7 @@ export function tokenProductsMiddleware(opts = {}) {
   const watch = tokenWatchHooksMiddleware(opts);
   const signal = tokenSignalMiddleware(opts);
   return async function tokenProducts(req, res, next) {
+    attachAgoreanReviews(req, res);
     const path = (req.url ?? "").split("?")[0].replace(/\/+$/, "") || "/";
     // Challenge is its own route so domain verify does not depend on /mcp.
     // Server Card is GET /mcp/server-card (and well-known aliases) — never GET /mcp.

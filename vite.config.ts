@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { agoreanReviewsVitePlugin } from "./server/agoreanReviews.mjs";
 import { tokenProductsVitePlugin } from "./server/tokenProducts.mjs";
 import { x402DiscoveryVitePlugin } from "./server/x402Discovery.mjs";
 import { openaiAppsChallengeVitePlugin } from "./server/openaiAppsChallenge.mjs";
@@ -21,6 +22,7 @@ const basePath = process.env.BASE_PATH ?? "/";
 export default defineConfig({
   base: basePath,
   plugins: [
+    agoreanReviewsVitePlugin(),
     openaiAppsChallengeVitePlugin(),
     mcpDiscoveryVitePlugin(),
     mcpLiveStubVitePlugin(),

@@ -19,6 +19,7 @@ import {
   verifyToken,
   vitePlugin,
 } from "./http.mjs";
+import { vetPublicUrl } from "./ssrfGuard.mjs";
 
 export const CRAWL_MAX_PAGES = 25;
 export const CRAWL_CONCURRENCY = 5;
@@ -165,7 +166,7 @@ function pushCandidate(candidates, raw) {
   candidates.push(url);
 }
 
-async function discover(fetchImpl, start, origin) {
+async function discover(fetchImpl, start, origin, lookup) {
   const sources = [];
   const candidates = [];
   pushCandidate(candidates, start);
@@ -176,6 +177,7 @@ async function discover(fetchImpl, start, origin) {
   const robots = await safeFetch(fetchImpl, `${origin}/robots.txt`, {
     maxBytes: 64 * 1024,
     timeoutMs: 8_000,
+    lookup,
   });
   if (robots.status === 200 && robots.buffer) {
     const listed = sitemapsFromRobots(robots.buffer.toString("utf8"), origin);
@@ -188,7 +190,7 @@ async function discover(fetchImpl, start, origin) {
     if (depth > 2 || seenSitemaps.has(url) || seenSitemaps.size > 8) return;
     if (!sameOrigin(url, origin) || isBlockedUrl(url)) return;
     seenSitemaps.add(url);
-    const fetched = await safeFetch(fetchImpl, url, { maxBytes: SITEMAP_MAX_BYTES, timeoutMs: 10_000 });
+    const fetched = await safeFetch(fetchImpl, url, { maxBytes: SITEMAP_MAX_BYTES, timeoutMs: 10_000, lookup });
     if (fetched.status !== 200 || !fetched.buffer) return;
     const xml = fetched.buffer.toString("utf8");
     const locs = locsFromXml(xml);
@@ -211,7 +213,7 @@ async function discover(fetchImpl, start, origin) {
     if (candidates.length >= DISCOVERY_CAP) break;
   }
 
-  const startPage = await safeFetch(fetchImpl, start, { maxBytes: HTML_MAX_BYTES, timeoutMs: 12_000 });
+  const startPage = await safeFetch(fetchImpl, start, { maxBytes: HTML_MAX_BYTES, timeoutMs: 12_000, lookup });
   if (startPage.status === 200 && startPage.buffer) {
     const html = startPage.buffer.toString("utf8");
     const links = linksFromHtml(html, startPage.url || start);
@@ -231,6 +233,7 @@ export function createCrawlHandler(opts = {}) {
     "",
   );
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
+  const lookup = opts.lookup;
 
   return async function handleCrawl(request) {
     const token = getBearerToken(request.headers);
@@ -251,6 +254,8 @@ export function createCrawlHandler(opts = {}) {
     const startRaw = method === "GET" ? url.searchParams.get("url") : body.url ?? body.start ?? body.origin;
     const start = normalizeStartUrl(startRaw);
     if (start.error) return { status: start.status ?? 400, body: { error: start.error } };
+    const startVerdict = await vetPublicUrl(start.url, { lookup });
+    if (!startVerdict.ok) return { status: 403, body: { error: "Invalid URL" } };
 
     let maxPages = Number(method === "GET" ? url.searchParams.get("maxPages") : body.maxPages);
     if (!Number.isFinite(maxPages) || maxPages <= 0) maxPages = CRAWL_MAX_PAGES;
@@ -263,13 +268,21 @@ export function createCrawlHandler(opts = {}) {
       ? url.searchParams.get("stripImages") === "true"
       : Boolean(body.stripImages);
 
-    const { candidates, sources } = await discover(fetchImpl, start.url, start.origin);
+    const { candidates, sources } = await discover(fetchImpl, start.url, start.origin, lookup);
     const pages = pickPages(candidates, start.origin, maxPages);
     if (pages.length === 0) {
       pages.push(canonicalizePageUrl(start.url) || start.url);
     }
 
     const results = await mapPool(pages, CRAWL_CONCURRENCY, async (pageUrl) => {
+      const pageVerdict = await vetPublicUrl(pageUrl, { lookup });
+      if (!pageVerdict.ok) {
+        return {
+          url: pageUrl,
+          ok: false,
+          error: { status: 403, message: "Private, loopback, and link-local addresses are blocked" },
+        };
+      }
       const read = await tokenRead(fetchImpl, upstream, token, pageUrl, { stripLinks, stripImages });
       if (read.status === 401) return { halt: 401, body: { error: "unknown token" } };
       if (read.status === 402) {

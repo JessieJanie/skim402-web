@@ -1,6 +1,11 @@
 import React from "react";
 import { SkimBackground, SkimNav, SkimFooter } from "@/components/layout/SkimChrome";
+import { useDocumentMeta } from "@/hooks/useDocumentMeta";
 import { fetchAccountCredits } from "@/lib/accountCredits";
+
+const HOME_TITLE = "Skim — 4x fewer tokens per page: clean Markdown for agents";
+const HOME_DESCRIPTION =
+  "Skim is a clean URL-to-markdown reader for agents. Card API key (sk402_) is the default path; USDC on Base via x402 is optional.";
 
 const API_BASE = `${import.meta.env.BASE_URL}api`;
 const SESSION_KEY_STORAGE = "skim-workbench-trial-key";
@@ -353,6 +358,12 @@ function HeroDemo() {
 }
 
 export default function Home() {
+  useDocumentMeta({
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    canonical: "https://skim402.com/",
+  });
+
   return (
     <main className="skim-page">
       <SkimBackground />
@@ -360,9 +371,11 @@ export default function Home() {
         <SkimNav />
 
         <section id="top" className="skim-hero">
-          <p className="skim-eyebrow">Just skim it...</p>
-          <h1 style={{margin:"0 0 8px",color:"#5e6778",fontSize:"44px",fontWeight:700,lineHeight:1.1,letterSpacing:"-.055em",textAlign:"center"}}>Clean markdown for any URL.</h1>
-          <p className="skim-proof" style={{textAlign:"center",marginTop:8}}>Free API key · 1,000 credits · no wallet required</p>
+          <p className="skim-hero-lead">Skim hands your agent clean Markdown, not raw HTML.</p>
+          <h1 className="skim-hero-headline">
+            <span className="skim-hero-headline-accent">4x Fewer Tokens Per Page</span>{" "}
+            <span className="skim-hero-headline-rest">clean text, nothing cut</span>
+          </h1>
           <TrialKeyBox />
           {/* Static CTA — always in server HTML; visible to crawlers, agents, and humans */}
           <div className="skim-hero-offers">

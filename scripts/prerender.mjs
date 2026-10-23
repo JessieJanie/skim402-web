@@ -41,10 +41,10 @@ const routes = [
     path: "/",
     outFile: "index.html",
     lastmod: "2026-08-17",
-    title: "Skim — a clean URL-to-markdown reader for agents",
+    title: "Skim — 4x fewer tokens per page: clean Markdown for agents",
     description:
       "Skim is a clean URL-to-markdown reader for agents. Card API key (sk402_) is the default path; USDC on Base via x402 is optional.",
-    ogTitle: "Skim — a clean URL-to-markdown reader for agents",
+    ogTitle: "Skim — 4x fewer tokens per page: clean Markdown for agents",
     ogDescription:
       "Skim is a clean URL-to-markdown reader for agents. Card API key (sk402_) is the default path; USDC on Base via x402 is optional.",
   },

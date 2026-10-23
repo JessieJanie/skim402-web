@@ -25,7 +25,10 @@
 .skim-hero { position: relative; max-width: 980px; margin: auto; padding: 56px 28px 92px; }
 .skim-hero:before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(rgba(35,108,255,.14) 1px, transparent 1px); background-size: 24px 24px; mask-image: linear-gradient(#000, transparent 78%); animation: grid-drift 20s ease-in-out infinite; }
 @keyframes grid-drift { 0%,100%{background-position:0 0} 50%{background-position:18px 0} }
-.skim-eyebrow { margin: 0 0 22px; color: #5e6778; font-size: 44px; font-weight: 700; line-height: 1.1; letter-spacing: -.055em; text-align: center; }
+.skim-hero-lead { margin: 0 auto 18px; max-width: 38rem; text-align: center; text-wrap: balance; color: rgba(16,19,26,.58); font-size: 18px; font-weight: 500; line-height: 1.45; letter-spacing: -.018em; }
+.skim-hero-headline { margin: 0; text-align: center; color: #5e6778; font-size: clamp(1.4rem, 7.15vw, 2.75rem); font-weight: 700; line-height: 1.08; letter-spacing: -.055em; }
+.skim-hero-headline-accent, .skim-hero-headline-rest { display: block; }
+.skim-hero-headline-accent { color: #236CFF; }
 .skim-url-wrap { max-width: 780px; margin-left: auto; margin-right: auto; padding: 1.5px; border-radius: 17px; background: conic-gradient(from var(--angle), #236CFF, #93b4ff, #236CFF); animation: spin-border 5s linear infinite; box-shadow: 0 16px 50px rgba(35,108,255,.14); }
 @property --angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
 @keyframes spin-border { to { --angle: 360deg; } }
@@ -66,7 +69,6 @@
 .skim-connect-copy p { margin: 10px 0 0; color: rgba(16,19,26,.53); font-size: 17px; letter-spacing: -.02em; }
 .skim-github { margin: 28px 0 0; text-align: center; color: rgba(16,19,26,.42); font-size: 11px; font-weight: 300; }
 .skim-headline { padding: 82px 28px 102px; text-align: center; }
-.skim-proof { margin: 22px 0 0; color: rgba(16,19,26,.5); font-size: 17px; }
 
 /* Static CTA row — always in server HTML; visible to crawlers and humans */
 .skim-hero-offers { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px 18px; margin: 22px auto 0; max-width: 680px; }
@@ -158,11 +160,11 @@
 }
 @media (max-width: 520px) {
   .skim-nav { padding: 0 20px; }
-  .skim-eyebrow { font-size: 32px; letter-spacing: .1em; }
   .skim-hero, .skim-connect, .skim-footer { padding-left: 20px; padding-right: 20px; }
+  .skim-hero-lead { margin-bottom: 12px; font-size: 15px; }
+  .skim-hero-headline { letter-spacing: -.048em; }
   .skim-receipt { gap: 9px; }
   .skim-markdown { min-height: 220px; font-size: 10px; }
-  .skim-proof { font-size: 14px; }
   .skim-headline { padding-top: 65px; }
   .skim-footer { padding-bottom: 28px; }
 }

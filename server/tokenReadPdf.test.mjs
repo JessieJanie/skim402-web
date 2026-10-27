@@ -358,6 +358,151 @@ test("read-pdf blocks private URLs", async () => {
   assert.equal(result.status, 403);
 });
 
+function toUnicodeCmap(pairs) {
+  const lines = pairs.map(
+    ([code, dest]) => `<${code.toString(16).padStart(2, "0").toUpperCase()}> <${dest}>`,
+  );
+  return `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /Adobe-Identity-UCS def
+/CMapType 2 def
+1 begincodespacerange
+<00> <FF>
+endcodespacerange
+${lines.length} beginbfchar
+${lines.join("\n")}
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop end end
+`;
+}
+
+function wrapPdf(objects) {
+  return Buffer.from(`%PDF-1.4\n${objects.join("\n")}\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n`, "latin1");
+}
+
+function streamObj(id, dict, payload) {
+  return `${id} 0 obj\n<< ${dict} /Length ${payload.length} >>\nstream\n${payload}endstream\nendobj`;
+}
+
+test("ligature bytes follow indirect resources, parents, differences, and object streams", () => {
+  const text = "BT /F1 12 Tf 72 700 Td (\\002rst speci\\002c \\003ow) Tj ET\n";
+  const cmap = toUnicodeCmap([
+    [0x02, "00660069"],
+    [0x03, "0066006C"],
+  ]);
+  const indirect = wrapPdf([
+    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources 8 0 R >> endobj",
+    streamObj(4, "", text),
+    "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /NimbusRomNo9L /ToUnicode 6 0 R >> endobj",
+    streamObj(6, "", cmap),
+    "8 0 obj << /Font << /F1 5 0 R >> >> endobj",
+  ]);
+  assert.match(pdfToMarkdown(indirect).text, /first specific flow/);
+
+  const inherited = wrapPdf([
+    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 /Resources << /Font << /F1 5 0 R >> >> >> endobj",
+    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >> endobj",
+    streamObj(4, "", text),
+    "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /NimbusRomNo9L /ToUnicode 6 0 R >> endobj",
+    streamObj(6, "", cmap),
+  ]);
+  assert.match(pdfToMarkdown(inherited).text, /first specific flow/);
+
+  const differences = wrapPdf([
+    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font 8 0 R >> >> endobj",
+    streamObj(4, "", text),
+    "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /NimbusRomNo9L /Encoding 6 0 R >> endobj",
+    "6 0 obj << /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [ 2 /fi /fl ] >> endobj",
+    "8 0 obj << /F1 5 0 R >> endobj",
+  ]);
+  assert.match(pdfToMarkdown(differences).text, /first specific flow/);
+
+  const presentation = wrapPdf([
+    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj",
+    streamObj(4, "", "BT /F1 12 Tf 72 700 Td (\\002\\003\\023\\024\\025\\026\\027) Tj ET\n"),
+    "5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /NimbusRomNo9L /ToUnicode 6 0 R >> endobj",
+    streamObj(
+      6,
+      "",
+      toUnicodeCmap([
+        [0x02, "FB01"],
+        [0x03, "FB02"],
+        [0x13, "FB00"],
+        [0x14, "FB03"],
+        [0x15, "FB04"],
+        [0x16, "FB05"],
+        [0x17, "FB06"],
+      ]),
+    ),
+  ]);
+  const presented = pdfToMarkdown(presentation).text;
+  assert.match(presented, /fiflffffifflstst/);
+  assert.equal(presented.includes("\uFB01"), false);
+
+  let data = "";
+  const members = [
+    { id: 10, body: "<< /Font << /F1 5 0 R >> >>\n" },
+    { id: 5, body: "<< /Type /Font /Subtype /Type1 /BaseFont /NimbusRomNo9L /ToUnicode 6 0 R >>\n" },
+  ];
+  const pairs = [];
+  for (const member of members) {
+    pairs.push(`${member.id} ${Buffer.byteLength(data, "latin1")}`);
+    data += member.body;
+  }
+  const header = `${pairs.join(" ")}\n`;
+  const payload = header + data;
+  const objStm = wrapPdf([
+    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
+    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources 10 0 R >> endobj",
+    streamObj(4, "", text),
+    streamObj(6, "", cmap),
+    streamObj(9, `/Type /ObjStm /N ${members.length} /First ${Buffer.byteLength(header, "latin1")}`, payload),
+  ]);
+  assert.match(pdfToMarkdown(objStm).text, /first specific flow/);
+});
+
+function wordCount(text, word) {
+  return (String(text).match(new RegExp(`\\b${word}\\b`, "gi")) || []).length;
+}
+
+// Pages 1, 5, and 9 of arXiv:1706.03762. NimbusRomNo9L stores fi/fl as one byte,
+// and each page's /Resources entry is an indirect object.
+test("arXiv 1706.03762 keeps fi/fl ligatures (first, specific, flow)", () => {
+  const pdf = readFileSync(new URL("./fixtures/arxiv-1706.03762-ligatures.pdf", import.meta.url));
+  const parsed = pdfToMarkdown(pdf);
+  assert.match(parsed.text, /\bfirst\b/);
+  assert.match(parsed.text, /\bspecific\b/);
+  assert.match(parsed.text, /\bflow\b/);
+  assert.equal(/\brst\b/.test(parsed.text), false);
+  assert.equal(parsed.text.includes("specic"), false);
+  assert.equal(controlCharCount(parsed.text), 0);
+
+  const dir = mkdtempSync(join(tmpdir(), "skim-pdf-lig-"));
+  const pdfPath = join(dir, "arxiv.pdf");
+  const txtPath = join(dir, "arxiv.txt");
+  try {
+    writeFileSync(pdfPath, pdf);
+    execFileSync("pdftotext", ["-q", pdfPath, txtPath], { timeout: 15000 });
+    const poppler = readFileSync(txtPath, "utf8");
+    for (const word of ["first", "specific", "flow"]) {
+      assert.equal(wordCount(parsed.text, word), wordCount(poppler, word), word);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("empty PDFs return empty_pdf, charged 0, and skip debit", async () => {
   let debited = 0;
   const handle = createReadPdfHandler({

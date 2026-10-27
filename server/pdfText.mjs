@@ -13,6 +13,8 @@
  * Subset fonts (Census appendix tables) store digits as character codes
  * below 32. The page's ToUnicode CMap is what turns those bytes into
  * "132,200". Without it the line is control characters and gets dropped.
+ * LaTeX and NIST fonts do the same for the fi/fl/ff/ffi/ffl ligatures.
+ * The map still applies when /Resources or /Font is an indirect object.
  */
 
 import { inflateRawSync, inflateSync } from "node:zlib";
@@ -228,6 +230,34 @@ function tokenizeContent(src) {
   return tokens;
 }
 
+// Presentation-form ligatures. Some ToUnicode maps emit these instead of "fi".
+const LIGATURE_CHARS = {
+  0xfb00: "ff",
+  0xfb01: "fi",
+  0xfb02: "fl",
+  0xfb03: "ffi",
+  0xfb04: "ffl",
+  0xfb05: "st",
+  0xfb06: "st",
+};
+
+function expandLigatures(text) {
+  let needs = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code >= 0xfb00 && code <= 0xfb06) {
+      needs = true;
+      break;
+    }
+  }
+  if (!needs) return text;
+  let out = "";
+  for (let i = 0; i < text.length; i += 1) {
+    out += LIGATURE_CHARS[text.charCodeAt(i)] ?? text[i];
+  }
+  return out;
+}
+
 function decodeShown(raw, map) {
   if (!map || map.size === 0) return toWinAnsiUnicode(raw);
   let out = "";
@@ -265,8 +295,8 @@ export function extractStringsFromContent(content, fontMaps) {
   let lastStr = "";
 
   function shown(tok) {
-    if (!tok.raw) return tok.v;
-    return decodeShown(tok.v, fontMaps && fontMaps[activeFont]);
+    const text = tok.raw ? decodeShown(tok.v, fontMaps && fontMaps[activeFont]) : tok.v;
+    return expandLigatures(text);
   }
 
   function flush() {
@@ -569,33 +599,103 @@ function streamText(stream) {
   return bytes.toString("latin1");
 }
 
-/** stream object id -> { fontName: Map<code, unicode> } from ToUnicode. */
+const LIGATURE_GLYPHS = {
+  fi: "fi",
+  fl: "fl",
+  ff: "ff",
+  ffi: "ffi",
+  ffl: "ffl",
+};
+
+/** Latest traditional xref table, or null when the file has none. */
+function loadXrefOffsets(src) {
+  try {
+    const starts = [...src.matchAll(/startxref\s+(\d+)/g)];
+    if (!starts.length) return null;
+    let pos = Number(starts[starts.length - 1][1]);
+    const offsets = new Map();
+    const seen = new Set();
+    while (Number.isFinite(pos) && pos >= 0 && pos < src.length && !seen.has(pos)) {
+      seen.add(pos);
+      if (!src.startsWith("xref", pos)) break;
+      let i = pos + 4;
+      let trailer = false;
+      while (i < src.length && !trailer) {
+        while (i < src.length && /\s/.test(src[i])) i += 1;
+        if (src.startsWith("trailer", i)) {
+          const dictAt = src.indexOf("<<", i);
+          const dict = dictAt >= 0 ? balancedDict(src, dictAt) : "";
+          const prev = /\/Prev\s+(\d+)/.exec(dict || "");
+          pos = prev ? Number(prev[1]) : NaN;
+          trailer = true;
+          break;
+        }
+        const header = /^(\d+)\s+(\d+)\s*/.exec(src.slice(i, i + 40));
+        if (!header) return offsets.size ? offsets : null;
+        const startId = Number(header[1]);
+        const count = Number(header[2]);
+        if (count > 2_000_000) return offsets.size ? offsets : null;
+        i += header[0].length;
+        for (let n = 0; n < count; n += 1) {
+          if (i + 18 > src.length) return offsets.size ? offsets : null;
+          const entry = /^(\d{10}) (\d{5}) ([nf])/.exec(src.slice(i, i + 20));
+          if (entry && entry[3] === "n" && !offsets.has(startId + n)) {
+            offsets.set(startId + n, Number(entry[1]));
+          }
+          i += 20;
+        }
+      }
+    }
+    return offsets.size ? offsets : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseLigatureDifferences(body) {
+  const found = [];
+  const block = /\/Differences\s*\[([^\]]*)\]/.exec(body || "");
+  if (!block) return found;
+  let code = null;
+  const tok = /(\d+)|\/([A-Za-z0-9]+)/g;
+  let item;
+  while ((item = tok.exec(block[1]))) {
+    if (item[1] != null) {
+      code = Number(item[1]);
+    } else if (code != null) {
+      const text = LIGATURE_GLYPHS[item[2]];
+      if (text) found.push([code, text]);
+      code += 1;
+    }
+  }
+  return found;
+}
+
+/**
+ * stream object id -> { fontName: Map<code, unicode> }.
+ * /Resources and /Font may be indirect, including object-stream members,
+ * and /Resources may be inherited from a parent /Pages node. ToUnicode
+ * wins; /Differences names fi/fl/ff/ffi/ffl fill codes the map omits.
+ */
 function loadStreamFontMaps(buffer, streams) {
   const src = buffer.toString("latin1");
   const streamById = new Map();
   for (const stream of streams) {
     if (stream.id != null) streamById.set(stream.id, stream);
   }
-  const fontToCmap = new Map();
-  const dicts = [];
-
-  function noteFont(id, body) {
-    const toUnicode = /\/ToUnicode\s+(\d+)\s+0\s+R/.exec(body);
-    if (toUnicode) fontToCmap.set(id, Number(toUnicode[1]));
-  }
+  const xref = loadXrefOffsets(src);
+  const objects = new Map();
 
   const objRe = /(\d+)\s+0\s+obj/g;
   let match;
   while ((match = objRe.exec(src))) {
+    const id = Number(match[1]);
+    if (xref && xref.get(id) !== match.index) continue;
     let i = match.index + match[0].length;
     while (i < src.length && /\s/.test(src[i])) i += 1;
     if (!src.startsWith("<<", i)) continue;
     const dict = balancedDict(src, i);
-    if (!dict) continue;
-    if (!/\/(?:Contents|Font|ToUnicode|BaseFont|Subtype)\b/.test(dict)) continue;
-    const id = Number(match[1]);
-    dicts.push({ id, dict });
-    if (/\/BaseFont\b/.test(dict) || /\/ToUnicode\b/.test(dict)) noteFont(id, dict);
+    if (dict) objects.set(id, dict);
   }
 
   for (const stream of streams) {
@@ -607,19 +707,45 @@ function loadStreamFontMaps(buffer, streams) {
     if (!count || !Number.isFinite(first) || first < 0 || first > latin.length) continue;
     const header = latin.slice(0, first).trim().split(/\s+/);
     const pairs = [];
-    for (let i = 0; i + 1 < header.length; i += 2) {
+    for (let i = 0; i + 1 < header.length && pairs.length < count; i += 2) {
       pairs.push([Number(header[i]), Number(header[i + 1])]);
     }
     for (let i = 0; i < pairs.length; i += 1) {
       const [id, offset] = pairs[i];
-      if (!Number.isFinite(id) || !Number.isFinite(offset)) continue;
+      if (!Number.isFinite(id) || !Number.isFinite(offset) || objects.has(id)) continue;
       const start = first + offset;
       const end = i + 1 < pairs.length ? first + pairs[i + 1][1] : latin.length;
       if (start < 0 || end <= start || end > latin.length + 1) continue;
-      const body = latin.slice(start, end);
-      if (/\/ToUnicode\b/.test(body) || /\/BaseFont\b/.test(body)) noteFont(id, body);
-      if (/\/Contents\b/.test(body) || /\/Subtype\s*\/Form\b/.test(body)) dicts.push({ id, dict: body });
+      objects.set(id, latin.slice(start, end));
     }
+  }
+
+  function objectDict(id) {
+    const body = objects.get(id);
+    if (!body) return "";
+    const start = body.indexOf("<<");
+    if (start < 0) return "";
+    return balancedDict(body, start);
+  }
+
+  function resolveKeyDict(dict, key) {
+    if (!dict) return "";
+    const hit = new RegExp(`\\/${key}(?![A-Za-z0-9])\\s*`).exec(dict);
+    if (!hit) return "";
+    const i = hit.index + hit[0].length;
+    if (dict.startsWith("<<", i)) return balancedDict(dict, i);
+    const ref = /^(\d+)\s+0\s+R/.exec(dict.slice(i));
+    return ref ? objectDict(Number(ref[1])) : "";
+  }
+
+  function resourcesFor(dict, seen = new Set()) {
+    if (/\/Resources(?![A-Za-z0-9])/.test(dict)) return resolveKeyDict(dict, "Resources");
+    const parent = /\/Parent\s+(\d+)\s+0\s+R/.exec(dict || "");
+    if (!parent) return "";
+    const pid = Number(parent[1]);
+    if (seen.has(pid)) return "";
+    seen.add(pid);
+    return resourcesFor(objectDict(pid), seen);
   }
 
   const cmapCache = new Map();
@@ -633,33 +759,62 @@ function loadStreamFontMaps(buffer, streams) {
     return map;
   }
 
-  const byStream = new Map();
-  for (const { id, dict } of dicts) {
-    const block = /\/Font\s*<<([^>]*)>>/.exec(dict);
-    if (!block) continue;
-    const fonts = {};
-    const fontRef = /\/([A-Za-z0-9_.]+)\s+(\d+)\s+0\s+R/g;
-    let font;
-    let any = false;
-    while ((font = fontRef.exec(block[1]))) {
-      const cmapId = fontToCmap.get(Number(font[2]));
-      if (!cmapId) continue;
-      const map = cmapFor(cmapId);
-      if (map && map.size) {
-        fonts[font[1]] = map;
-        any = true;
-      }
+  function ligaturesFor(fontBody) {
+    if (/\/Differences\b/.test(fontBody)) return parseLigatureDifferences(fontBody);
+    if (!/\/Encoding(?![A-Za-z0-9])/.test(fontBody)) return [];
+    return parseLigatureDifferences(resolveKeyDict(fontBody, "Encoding"));
+  }
+
+  function mapForFont(fontBody) {
+    if (!fontBody || !/\/(?:BaseFont|ToUnicode|Encoding|Subtype|DescendantFonts)\b/.test(fontBody)) {
+      return null;
     }
-    if (!any) continue;
+    const map = new Map();
+    const toUnicode = /\/ToUnicode\s+(\d+)\s+0\s+R/.exec(fontBody);
+    if (toUnicode) {
+      for (const [code, text] of cmapFor(Number(toUnicode[1]))) map.set(code, text);
+    }
+    for (const [code, text] of ligaturesFor(fontBody)) {
+      if (!map.has(code)) map.set(code, text);
+    }
+    return map.size ? map : null;
+  }
+
+  function fontsFrom(resources) {
+    const fontDict = resolveKeyDict(resources, "Font");
+    if (!fontDict) return null;
+    const fonts = {};
+    const re = /\/([A-Za-z0-9_.]+)\s*(?:(\d+)\s+0\s+R|<<)/g;
+    let item;
+    let guard = 0;
+    while ((item = re.exec(fontDict)) && guard < 400) {
+      guard += 1;
+      let fontBody = "";
+      if (item[2]) {
+        fontBody = objectDict(Number(item[2]));
+      } else {
+        const at = item.index + item[0].length - 2;
+        fontBody = balancedDict(fontDict, at);
+        re.lastIndex = at + (fontBody.length || 2);
+      }
+      const map = mapForFont(fontBody);
+      if (map) fonts[item[1]] = map;
+    }
+    return Object.keys(fonts).length ? fonts : null;
+  }
+
+  const byStream = new Map();
+  for (const [id, dict] of objects) {
+    if (!/\/Contents\b/.test(dict) && !/\/Subtype\s*\/Form\b/.test(dict)) continue;
+    const fonts = fontsFrom(resourcesFor(dict));
+    if (!fonts) continue;
     const streamIds = [];
     const single = /\/Contents\s+(\d+)\s+0\s+R/g;
     let one;
     while ((one = single.exec(dict))) streamIds.push(Number(one[1]));
     const many = /\/Contents\s*\[([^\]]*)\]/.exec(dict);
     if (many) {
-      for (const ref of many[1].match(/(\d+)\s+0\s+R/g) || []) {
-        streamIds.push(Number(ref));
-      }
+      for (const ref of many[1].matchAll(/(\d+)\s+0\s+R/g)) streamIds.push(Number(ref[1]));
     }
     if (/\/Subtype\s*\/Form\b/.test(dict)) streamIds.push(id);
     for (const streamId of streamIds) byStream.set(streamId, fonts);

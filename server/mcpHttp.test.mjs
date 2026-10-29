@@ -36,11 +36,12 @@ function mockFetch(routes) {
   };
 }
 
-function handler(routes = {}, env = {}) {
+function handler(routes = {}, env = {}, extra = {}) {
   return createMcpHandler({
     upstream: "https://skim402.com",
     fetchImpl: mockFetch(routes),
     env,
+    ...extra,
   });
 }
 
@@ -156,6 +157,33 @@ test("tool calls without a key are rejected", async () => {
   assert.equal(res.status, 200);
   assert.equal(res.body.result.isError, true);
   assert.match(res.body.result.content[0].text, /sk402_/);
+});
+
+test("privately resolving hostnames never hit upstream", async () => {
+  let hits = 0;
+  const handle = handler(
+    {
+      "GET /api/t/read": () => {
+        hits += 1;
+        return { body: { markdown: "nope" } };
+      },
+    },
+    {},
+    { lookup: async () => [{ address: "127.0.0.1", family: 4 }] },
+  );
+  const res = await rpc(
+    handle,
+    {
+      jsonrpc: "2.0",
+      id: 11,
+      method: "tools/call",
+      params: { name: "read_url", arguments: { url: "https://127.0.0.1.nip.io/" } },
+    },
+    { authorization: `Bearer ${KEY}` },
+  );
+  assert.equal(res.body.result.isError, true);
+  assert.match(res.body.result.content[0].text, /non-public/);
+  assert.equal(hits, 0);
 });
 
 test("private and file URLs never hit upstream", async () => {

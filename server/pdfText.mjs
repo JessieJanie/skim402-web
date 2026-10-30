@@ -15,6 +15,11 @@
  * "132,200". Without it the line is control characters and gets dropped.
  * LaTeX and NIST fonts do the same for the fi/fl/ff/ffi/ffl ligatures.
  * The map still applies when /Resources or /Font is an indirect object.
+ *
+ * After the glyphs are decoded, page cleanup drops running headers and
+ * footers (one copy of each is kept), drops page numbers, rejoins wrapped
+ * lines and syllable hyphens, and collapses stray whitespace. Table rows
+ * and their numbers stay. Credit amounts are not decided here.
  */
 
 import { inflateRawSync, inflateSync } from "node:zlib";
@@ -277,7 +282,7 @@ function decodeShown(raw, map) {
  *
  * fontMaps is font resource name -> ToUnicode code map for this stream.
  */
-export function extractStringsFromContent(content, fontMaps) {
+export function extractStringsFromContent(content, fontMaps, positioned = false) {
   const src = typeof content === "string" ? content : content.toString("latin1");
   const tokens = tokenizeContent(src);
   const lines = [];
@@ -301,7 +306,7 @@ export function extractStringsFromContent(content, fontMaps) {
 
   function flush() {
     const cleaned = buf.replace(/[ \t\f\v]+/g, " ").trim();
-    if (cleaned) lines.push(cleaned);
+    if (cleaned) lines.push({ text: cleaned, y: anchorY });
     buf = "";
     anchorY = null;
   }
@@ -343,12 +348,17 @@ export function extractStringsFromContent(content, fontMaps) {
       continue;
     }
     if (tok.v === "BT") {
+      // BT resets the text matrix. Without this, later Td offsets stack and
+      // a footer at y=40 looks like it sits thousands of points up the page.
       inText = true;
+      y = 0;
+      anchorY = null;
       continue;
     }
     if (tok.v === "ET") {
       flush();
       inText = false;
+      y = 0;
       lastStr = "";
       pendingArray = null;
       continue;
@@ -422,18 +432,33 @@ export function extractStringsFromContent(content, fontMaps) {
     if (/^[A-Za-z]/.test(tok.v)) nums.length = 0;
   }
   flush();
-  return rejoinWrappedWords(lines);
+  const rejoined = rejoinWrappedWords(lines);
+  if (positioned) return rejoined;
+  return rejoined.map((line) => line.text);
+}
+
+/** Same lines as extractStringsFromContent, plus the baseline y of each line. */
+export function extractPositionedLines(content, fontMaps) {
+  return extractStringsFromContent(content, fontMaps, true);
 }
 
 function rejoinWrappedWords(lines) {
   const out = [];
   for (const line of lines) {
+    const text = typeof line === "string" ? line : line.text;
     const prev = out[out.length - 1];
-    if (prev && /[A-Za-z]-$/.test(prev) && /^[a-z]/.test(line)) {
-      out[out.length - 1] = `${prev.slice(0, -1)}${line}`;
+    const prevText = prev ? (typeof prev === "string" ? prev : prev.text) : "";
+    if (prev && /[A-Za-z]\u00ad?-$/.test(prevText) && /^[a-z]/.test(text)) {
+      const nextWord = text.split(/\s/, 1)[0];
+      // "English-" + "to-German" keeps the hyphen. "con-" + "firmed" does not.
+      const joined = nextWord.includes("-")
+        ? `${prevText.replace(/\u00ad$/, "")}${text}`
+        : `${prevText.replace(/\u00ad-?$/, "").replace(/-$/, "")}${text}`;
+      if (typeof prev === "string") out[out.length - 1] = joined;
+      else prev.text = joined;
       continue;
     }
-    out.push(line);
+    out.push(typeof line === "string" ? line : { ...line });
   }
   return out;
 }
@@ -677,15 +702,9 @@ function parseLigatureDifferences(body) {
  * and /Resources may be inherited from a parent /Pages node. ToUnicode
  * wins; /Differences names fi/fl/ff/ffi/ffl fill codes the map omits.
  */
-function loadStreamFontMaps(buffer, streams) {
-  const src = buffer.toString("latin1");
-  const streamById = new Map();
-  for (const stream of streams) {
-    if (stream.id != null) streamById.set(stream.id, stream);
-  }
+function indexObjectDicts(src, streams) {
   const xref = loadXrefOffsets(src);
   const objects = new Map();
-
   const objRe = /(\d+)\s+0\s+obj/g;
   let match;
   while ((match = objRe.exec(src))) {
@@ -719,6 +738,16 @@ function loadStreamFontMaps(buffer, streams) {
       objects.set(id, latin.slice(start, end));
     }
   }
+  return objects;
+}
+
+function loadStreamFontMaps(buffer, streams) {
+  const src = buffer.toString("latin1");
+  const streamById = new Map();
+  for (const stream of streams) {
+    if (stream.id != null) streamById.set(stream.id, stream);
+  }
+  const objects = indexObjectDicts(src, streams);
 
   function objectDict(id) {
     const body = objects.get(id);
@@ -850,7 +879,82 @@ export function extractOutline(buffer) {
   return titles.slice(0, 80).map((title, i) => ({ title, level: 1, index: i }));
 }
 
-export function pdfToMarkdown(buffer) {
+function linesFromStream(stream, fontMaps) {
+  if (!stream || isNonTextStream(stream.before)) return [];
+  let bytes = stream.raw;
+  if (stream.flate) {
+    const inflated = inflateStream(bytes);
+    if (!inflated) return [];
+    bytes = inflated;
+  }
+  const latin = bytes.toString("latin1");
+  if (!looksLikePageContent(latin)) return [];
+  const positioned = extractPositionedLines(latin, fontMaps.get(stream.id));
+  const lines = [];
+  for (const item of positioned) {
+    const cleaned = sanitizeLine(String(item.text || "").replace(/[ \t\f\v]+/g, " ").trim());
+    if (cleaned) lines.push({ text: cleaned, y: item.y });
+  }
+  return lines;
+}
+
+function pageHeightOf(dict) {
+  const box = /\/MediaBox\s*\[([^\]]+)\]/.exec(dict || "");
+  if (!box) return 792;
+  const nums = box[1].trim().split(/\s+/).map(Number).filter((n) => Number.isFinite(n));
+  if (nums.length >= 4) return Math.abs(nums[3] - nums[1]) || 792;
+  return 792;
+}
+
+function contentStreamIds(dict) {
+  const ids = [];
+  const many = /\/Contents\s*\[([^\]]*)\]/.exec(dict || "");
+  if (many) {
+    for (const ref of many[1].matchAll(/(\d+)\s+0\s+R/g)) ids.push(Number(ref[1]));
+    return ids;
+  }
+  const one = /\/Contents\s+(\d+)\s+0\s+R/.exec(dict || "");
+  if (one) ids.push(Number(one[1]));
+  return ids;
+}
+
+function listPageDicts(objects) {
+  let root = null;
+  for (const dict of objects.values()) {
+    if (/\/Type\s*\/Catalog\b/.test(dict)) {
+      const ref = /\/Pages\s+(\d+)\s+0\s+R/.exec(dict);
+      if (ref) root = Number(ref[1]);
+    }
+  }
+  const pages = [];
+  const seen = new Set();
+  function visit(id) {
+    if (seen.has(id)) return;
+    seen.add(id);
+    const dict = objects.get(id);
+    if (!dict) return;
+    if (/\/Type\s*\/Pages\b/.test(dict)) {
+      const kids = /\/Kids\s*\[([^\]]*)\]/.exec(dict);
+      if (!kids) return;
+      for (const ref of kids[1].matchAll(/(\d+)\s+0\s+R/g)) visit(Number(ref[1]));
+      return;
+    }
+    if (/\/Type\s*\/Page\b/.test(dict)) pages.push(dict);
+  }
+  if (root != null) visit(root);
+  if (pages.length === 0) {
+    for (const dict of objects.values()) {
+      if (/\/Type\s*\/Page\b/.test(dict)) pages.push(dict);
+    }
+  }
+  return pages;
+}
+
+/**
+ * Pages in reading order. Each line keeps the baseline y from the content
+ * stream so headers and footers can be told from the body.
+ */
+export function extractPdfPages(buffer) {
   const streams = collectStreams(buffer);
   let fontMaps = new Map();
   try {
@@ -858,37 +962,206 @@ export function pdfToMarkdown(buffer) {
   } catch {
     fontMaps = new Map();
   }
-  const lines = [];
+  const streamById = new Map();
   for (const stream of streams) {
-    if (isNonTextStream(stream.before)) continue;
-    let bytes = stream.raw;
-    if (stream.flate) {
-      const inflated = inflateStream(bytes);
-      if (!inflated) continue;
-      bytes = inflated;
+    if (stream.id != null) streamById.set(stream.id, stream);
+  }
+  const objects = indexObjectDicts(buffer.toString("latin1"), streams);
+  const pages = [];
+  const used = new Set();
+  for (const dict of listPageDicts(objects)) {
+    const lines = [];
+    for (const id of contentStreamIds(dict)) {
+      used.add(id);
+      lines.push(...linesFromStream(streamById.get(id), fontMaps));
     }
-    const latin = bytes.toString("latin1");
-    if (!looksLikePageContent(latin)) continue;
-    const strings = extractStringsFromContent(latin, fontMaps.get(stream.id));
-    for (const s of strings) {
-      const cleaned = sanitizeLine(s.replace(/\s+/g, " ").trim());
-      if (cleaned) lines.push(cleaned);
+    pages.push({ height: pageHeightOf(dict), lines });
+  }
+  const orphans = [];
+  for (const stream of streams) {
+    if (stream.id != null && used.has(stream.id)) continue;
+    orphans.push(...linesFromStream(stream, fontMaps));
+  }
+  if (pages.length === 0) return [{ height: 792, lines: orphans }];
+  if (orphans.length) pages[pages.length - 1].lines.push(...orphans);
+  return pages;
+}
+
+function chromeBand(height) {
+  const size = Number(height) || 792;
+  return Math.min(60, Math.max(42, size * 0.07));
+}
+
+function isChromeLine(line, height) {
+  if (typeof line?.y !== "number" || !Number.isFinite(line.y)) return false;
+  const band = chromeBand(height);
+  return line.y >= height - band || line.y <= band;
+}
+
+/** A line whose entire text is a page number, not a table cell or a year. */
+export function isPageNumberLine(text) {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  if (!s || s.length > 24) return false;
+  return (
+    /^(?:page\s+)?\d{1,3}$/i.test(s) ||
+    /^[-–—]\s*\d{1,3}\s*[-–—]$/.test(s) ||
+    /^\d{1,3}\s*(?:\/|of)\s*\d{1,3}$/i.test(s) ||
+    /^page\s+\d{1,3}(?:\s*(?:of|\/)\s*\d{1,3})?$/i.test(s)
+  );
+}
+
+function chromeKey(text) {
+  return String(text || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function repeatedChromeKeys(pages) {
+  const counts = new Map();
+  for (const page of pages) {
+    const seen = new Set();
+    for (const line of page.lines) {
+      if (!isChromeLine(line, page.height)) continue;
+      const key = chromeKey(line.text);
+      if (key.length < 8 || seen.has(key)) continue;
+      seen.add(key);
+      counts.set(key, (counts.get(key) || 0) + 1);
     }
   }
+  const repeated = new Set();
+  const minPages = pages.length < 2 ? Infinity : Math.max(2, Math.ceil(pages.length * 0.6));
+  for (const [key, count] of counts) {
+    if (count >= minPages) repeated.add(key);
+  }
+  return repeated;
+}
 
-  if (lines.length === 0) {
-    const whole = buffer.toString("latin1");
-    if (looksLikePageContent(whole)) {
-      const fallback = extractStringsFromContent(whole);
-      for (const s of fallback) {
-        const cleaned = sanitizeLine(s.replace(/\s+/g, " ").trim());
-        if (cleaned) lines.push(cleaned);
+function sortReadingOrder(lines) {
+  return lines
+    .map((line, index) => ({ line, index }))
+    .sort((a, b) => {
+      const ay = typeof a.line.y === "number" ? a.line.y : -1e9;
+      const by = typeof b.line.y === "number" ? b.line.y : -1e9;
+      if (ay !== by) return by - ay;
+      return a.index - b.index;
+    })
+    .map((item) => item.line);
+}
+
+function looksLikeTableLine(text) {
+  const value = String(text || "");
+  if ((value.match(/ {2,}/g) || []).length >= 2) return true;
+  if ((value.match(/\|/g) || []).length >= 2) return true;
+  const nums = value.match(/\d[\d,]*(?:\.\d+)?/g) || [];
+  const letters = (value.match(/[A-Za-z]/g) || []).length;
+  return nums.length >= 3 && letters <= nums.length * 2;
+}
+
+const LINE_ABBREV = /(?:\b(?:Mr|Mrs|Ms|Dr|Prof|Jr|Sr|St|vs|etc|e\.g|i\.e|a\.m|p\.m|U\.S|Fig|No)\.)$/i;
+
+function joinKind(prev, next) {
+  if (!prev || !next) return null;
+  if (looksLikeTableLine(prev.text) || looksLikeTableLine(next.text)) return null;
+  if (isPageNumberLine(next.text)) return null;
+  if (/^(?:[•●▪◦*]|\d+[.)])\s/.test(next.text)) return null;
+  if (/^\d+(?:\.\d+)+\s+[A-Z]/.test(next.text)) return null;
+  const gap = typeof prev.y === "number" && typeof next.y === "number" ? prev.y - next.y : 14;
+  if (gap < -1) return null;
+  const hyphen = /[A-Za-z\u00C0-\u024F](?:\u00ad|-)$/.test(prev.text);
+  if (hyphen && gap <= 28) {
+    if (/^[a-z\u00E0-\u024F]/.test(next.text)) {
+      const nextWord = next.text.split(/\s/, 1)[0];
+      return nextWord.includes("-") ? "keep-hyphen" : "drop-hyphen";
+    }
+    if (/^[A-Z0-9]/.test(next.text)) return "keep-hyphen";
+  }
+  if (gap > 20) return null;
+  if (!/^[a-z0-9\u00E0-\u024F(“"']/.test(next.text)) return null;
+  if (/^\d+[.)]\s/.test(next.text)) return null;
+  if (/[.!?]["')\]]*$/.test(prev.text) && !LINE_ABBREV.test(prev.text)) return null;
+  return "space";
+}
+
+function joinWrapped(lines) {
+  const out = [];
+  for (const line of lines) {
+    const text = line.text.replace(/[ \t\f\v]+/g, " ").replace(/[ \t]+$/g, "").trim();
+    if (!text) continue;
+    const next = { ...line, text };
+    const prev = out[out.length - 1];
+    const kind = joinKind(prev, next);
+    if (kind === "drop-hyphen" || kind === "keep-hyphen" || kind === "space") {
+      if (kind === "drop-hyphen") {
+        prev.text = `${prev.text.replace(/\u00ad-?$/, "").replace(/-$/, "")}${text}`;
+      } else if (kind === "keep-hyphen") {
+        prev.text = `${prev.text.replace(/\u00ad$/, "")}${text}`;
+      } else {
+        prev.text = `${prev.text} ${text}`.replace(/[ \t]{2,}/g, " ");
       }
+      if (typeof next.y === "number") prev.y = next.y;
+      continue;
     }
+    out.push(next);
   }
+  return out;
+}
 
+/**
+ * Drop repeated running headers and footers (the first copy stays), drop
+ * page numbers, rejoin broken wraps and end-of-line hyphens, and collapse
+ * stray whitespace. Lines are not removed for being short, numeric, or tabular.
+ */
+export function cleanPdfText(pages) {
+  const normalized = (pages || []).map((page) => {
+    const lines = (page?.lines || page || []).map((line) => {
+      if (typeof line === "string") return { text: line.replace(/[ \t\f\v]+/g, " ").trim(), y: null };
+      return { text: String(line?.text || "").replace(/[ \t\f\v]+/g, " ").trim(), y: line?.y };
+    }).filter((line) => line.text);
+    return { height: page?.height || 792, lines };
+  }).filter((page) => page.lines.length);
+  for (const page of normalized) page.lines = sortReadingOrder(page.lines);
+  const repeated = repeatedChromeKeys(normalized);
+  const keptChrome = new Set();
+  const blocks = [];
+  for (const page of normalized) {
+    const kept = [];
+    page.lines.forEach((line, index) => {
+      // Page numbers sit in the top or bottom band. A bare 1–3 digit line in
+      // the body (a table cell, a footnote, a section) is kept. Lines with no
+      // baseline still drop a leading or trailing page number.
+      const band = isChromeLine(line, page.height);
+      const unplacedEdge = line.y == null && (index === 0 || index === page.lines.length - 1);
+      if (isPageNumberLine(line.text) && (band || unplacedEdge)) return;
+      const key = chromeKey(line.text);
+      if (isChromeLine(line, page.height) && repeated.has(key)) {
+        if (keptChrome.has(key)) return;
+        keptChrome.add(key);
+      }
+      kept.push(line);
+    });
+    const merged = joinWrapped(kept);
+    if (merged.length) blocks.push(merged.map((line) => line.text).join("\n"));
+  }
+  return blocks.join("\n\n").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function rawLinesFromBuffer(buffer) {
+  const pages = extractPdfPages(buffer);
+  const lines = pages.flatMap((page) => page.lines.map((line) => line.text)).filter(Boolean);
+  if (lines.length) return lines;
+  const whole = buffer.toString("latin1");
+  if (!looksLikePageContent(whole)) return lines;
+  return extractStringsFromContent(whole)
+    .map((s) => sanitizeLine(s.replace(/\s+/g, " ").trim()))
+    .filter(Boolean);
+}
+
+export function pdfToMarkdown(buffer) {
+  const pages = extractPdfPages(buffer);
+  let text = cleanPdfText(pages);
+  if (!text.trim()) {
+    const lines = rawLinesFromBuffer(buffer);
+    text = cleanPdfText([{ height: 792, lines }]);
+  }
   const outline = extractOutline(buffer);
-  const text = lines.join("\n");
   const markdown = outlineToMarkdown(text, outline);
   return { text, markdown, outline, pageHint: countPages(buffer) };
 }
@@ -901,12 +1174,25 @@ function countPages(buffer) {
   return pages ? pages.length : null;
 }
 
+function joinMarkdownBlocks(lines) {
+  let out = "";
+  for (let i = 0; i < lines.length; i += 1) {
+    if (i === 0) {
+      out = lines[i];
+      continue;
+    }
+    const tight = looksLikeTableLine(lines[i - 1]) && looksLikeTableLine(lines[i]);
+    out += tight ? "\n" : "\n\n";
+    out += lines[i];
+  }
+  return out;
+}
+
 function outlineToMarkdown(text, outline) {
   if (!text.trim()) return "";
-  const paragraphs = text.split(/\n+/).filter(Boolean);
-  if (outline.length === 0) {
-    return paragraphs.map((p) => p).join("\n\n");
-  }
+  const paragraphs = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const body = joinMarkdownBlocks(paragraphs);
+  if (outline.length === 0) return body;
   const used = new Set();
   const parts = [];
   for (const item of outline) {
@@ -916,6 +1202,6 @@ function outlineToMarkdown(text, outline) {
     const level = Math.min(3, Math.max(1, item.level || 1));
     parts.push(`${"#".repeat(level)} ${heading}`);
   }
-  parts.push(paragraphs.join("\n\n"));
+  parts.push(body);
   return parts.join("\n\n");
 }
